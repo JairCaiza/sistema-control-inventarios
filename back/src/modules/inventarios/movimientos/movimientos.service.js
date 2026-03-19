@@ -76,6 +76,24 @@ const crearMovimiento = async (data) => {
     }
 };
 
+const obtenerHistorialPorActivo = async (activo_id) => {
+
+    const result = await pool.query(
+        `SELECT 
+            id,
+            tipo_movimiento,
+            cantidad,
+            motivo,
+            referencia,
+            fecha_creacion
+         FROM movimientos_inventario
+         WHERE activo_id = $1
+         ORDER BY fecha_creacion DESC`,
+        [activo_id]
+    );
+
+    return result.rows;
+};
 module.exports = {
-    crearMovimiento
+    crearMovimiento, obtenerHistorialPorActivo
 };

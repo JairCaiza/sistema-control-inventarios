@@ -29,7 +29,32 @@ const crear = async (req, res) => {
         });
     }
 };
+const { obtenerHistorialPorActivo } = require("./movimientos.service");
+
+const historial = async (req, res) => {
+
+    try {
+
+        const { activo_id } = req.params;
+
+        const movimientos = await obtenerHistorialPorActivo(activo_id);
+
+        res.json({
+            success: true,
+            data: movimientos
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+};
 
 module.exports = {
-    crear
+    crear, historial
 };
