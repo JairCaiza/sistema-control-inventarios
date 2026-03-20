@@ -5,11 +5,14 @@ const protect = require("../../../middlewares/auth.middleware");
 
 const {
     crear,
-    listar
+    listar,
+    reporteInventario, exportarInventarioPDF
 } = require("./activos.controller");
 
 router.post("/", protect, crear);
 
 router.get("/", protect, listar);
+router.get("/reporte", protect, reporteInventario);
+router.get("/reporte/pdf", protect, exportarInventarioPDF);
 
 module.exports = router;

@@ -54,7 +54,53 @@ const historial = async (req, res) => {
     }
 
 };
+const { obtenerMovimientos } = require("./movimientos.service");
 
+const listar = async (req, res) => {
+
+    try {
+
+        const movimientos = await obtenerMovimientos();
+
+        res.json({
+            success: true,
+            data: movimientos
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+};
+const { obtenerKardex } = require("./movimientos.service");
+
+const kardex = async (req, res) => {
+
+    try {
+
+        const { activo_id } = req.params;
+
+        const data = await obtenerKardex(activo_id);
+
+        res.json({
+            success: true,
+            data
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+};
 module.exports = {
-    crear, historial
+    crear, historial, listar, kardex
 };

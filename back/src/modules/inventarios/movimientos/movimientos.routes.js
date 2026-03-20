@@ -3,9 +3,12 @@ const router = express.Router();
 
 const protect = require("../../../middlewares/auth.middleware");
 
-const { crear } = require("./movimientos.controller");
-const { historial } = require("./movimientos.controller");
+const { crear, historial, listar, kardex } = require("./movimientos.controller");
 
-router.post("/", protect, crear);
+router.get("/kardex/:activo_id", protect, kardex);
 router.get("/activo/:activo_id", protect, historial);
+
+router.get("/", protect, listar);
+router.post("/", protect, crear);
+
 module.exports = router;

@@ -76,8 +76,50 @@ const listarActivos = async () => {
 
     return result.rows;
 };
+const obtenerReporteInventario = async () => {
+
+    const result = await pool.query(`
+        SELECT 
+            a.id,
+            a.nombre AS activo,
+            c.nombre AS categoria,
+            u.nombre AS ubicacion,
+
+            COALESCE(SUM(
+                CASE 
+                    WHEN m.tipo_movimiento = 'entrada' THEN m.cantidad
+                    WHEN m.tipo_movimiento = 'salida' THEN -m.cantidad
+                    ELSE 0
+                END
+            ),0) AS stock
+
+        FROM activos a
+
+        LEFT JOIN categorias c 
+        ON a.categoria_id = c.id
+
+        LEFT JOIN ubicaciones u 
+        ON a.ubicacion_id = u.id
+
+        LEFT JOIN movimientos_inventario m
+        ON m.activo_id = a.id
+
+        GROUP BY 
+            a.id,
+            a.nombre,
+            c.nombre,
+            u.nombre
+
+        ORDER BY a.nombre ASC
+    `);
+
+    return result.rows;
+};
+
+
 
 module.exports = {
     crearActivo,
-    listarActivos
+    listarActivos,
+    obtenerReporteInventario
 };

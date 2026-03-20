@@ -108,9 +108,11 @@ CREATE INDEX idx_movimientos_activo ON movimientos_inventario(activo_id);
 
 CREATE TABLE clientes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tipo_cliente VARCHAR(20) NOT NULL,
     tipo_identificacion VARCHAR(20),
     identificacion VARCHAR(20) UNIQUE,
     nombre VARCHAR(150) NOT NULL,
+    apellido VARCHAR(150),
     telefono VARCHAR(20),
     direccion TEXT,
     correo VARCHAR(100),
