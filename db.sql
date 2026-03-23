@@ -134,6 +134,7 @@ CREATE TABLE contratos_alquiler (
     ),
     total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW(),
+    observaciones TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
 );
 
