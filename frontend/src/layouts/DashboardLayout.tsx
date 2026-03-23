@@ -1,31 +1,23 @@
 import { Outlet } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import Topbar from "../components/Topbar";
 
 function DashboardLayout() {
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          width: "250px",
-          background: "#1e293b",
-          color: "white",
-          padding: "20px",
-        }}
-      >
-        <h2>Inventario App</h2>
+    <div className="flex h-screen bg-gray-50">
+      {/* SIDEBAR */}
+      <Sidebar />
 
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          <li>Dashboard</li>
-          <li>Productos</li>
-          <li>Usuarios</li>
-          <li>Reportes</li>
-        </ul>
-      </aside>
+      {/* CONTENIDO */}
+      <div className="flex flex-col flex-1">
+        {/* TOPBAR */}
+        <Topbar />
 
-      {/* Contenido */}
-      <main style={{ flex: 1, padding: "20px" }}>
-        <Outlet />
-      </main>
+        {/* PAGE CONTENT */}
+        <main className="flex-1 p-6 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
