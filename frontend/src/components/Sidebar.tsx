@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   LayoutDashboard,
@@ -9,6 +9,8 @@ import {
   FileText,
   BarChart3,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 import logo from "../assets/logoguaraca.png";
@@ -16,77 +18,107 @@ import logo from "../assets/logoguaraca.png";
 function Sidebar() {
   const location = useLocation();
 
+  const [collapsed, setCollapsed] = useState(false);
   const [openAdmin, setOpenAdmin] = useState(false);
   const [openInventario, setOpenInventario] = useState(false);
+
+  /* guardar estado sidebar */
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebarCollapsed");
+    if (saved) setCollapsed(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", JSON.stringify(collapsed));
+  }, [collapsed]);
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <aside className="w-64 bg-[var(--color-bg-dark)] text-white flex flex-col">
-      {/* LOGO */}
-      <div className="flex items-center gap-3 p-5 border-b border-gray-700">
-        <img src={logo} className="w-10 h-10 object-contain" />
-        <span className="font-bold text-lg">ConstructSys</span>
+    <aside
+      className={`${
+        collapsed ? "w-20" : "w-64"
+      } bg-[var(--color-bg-dark)] text-white flex flex-col transition-all duration-300`}
+    >
+      {/* HEADER */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center gap-2">
+          <img src={logo} className="w-10 h-10 object-contain" />
+          {!collapsed && (
+            <span className="font-bold text-lg">ConstructSys</span>
+          )}
+        </div>
+
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-gray-300 hover:text-white"
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={20} />
+          ) : (
+            <PanelLeftClose size={20} />
+          )}
+        </button>
       </div>
 
       {/* MENU */}
-      <nav className="flex-1 p-4 space-y-2 text-sm">
+      <nav className="flex-1 p-3 space-y-2 text-sm">
         {/* DASHBOARD */}
         <Link
           to="/dashboard"
-          className={`flex items-center gap-2 p-2 rounded transition
+          title="Dashboard"
+          className={`flex items-center gap-3 p-2 rounded transition
           ${
             isActive("/dashboard")
               ? "bg-[var(--color-primary)]"
               : "hover:bg-[var(--color-primary)]"
-          }
-          `}
+          }`}
         >
           <LayoutDashboard size={18} />
-          Dashboard
+          {!collapsed && "Dashboard"}
         </Link>
 
-        {/* ADMINISTRACIÓN */}
+        {/* ADMINISTRACION */}
         <button
           onClick={() => setOpenAdmin(!openAdmin)}
           className="flex items-center justify-between w-full p-2 rounded hover:bg-[var(--color-primary)]"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-3">
             <Shield size={18} />
-            Administración
+            {!collapsed && "Administración"}
           </span>
 
-          <ChevronDown
-            size={16}
-            className={`transition ${openAdmin ? "rotate-180" : ""}`}
-          />
+          {!collapsed && (
+            <ChevronDown
+              size={16}
+              className={`transition ${openAdmin ? "rotate-180" : ""}`}
+            />
+          )}
         </button>
 
-        {openAdmin && (
+        {openAdmin && !collapsed && (
           <div className="ml-6 space-y-1">
             <Link
-              to="/usuarios"
+              to="/dashboard/usuarios"
               className={`flex items-center gap-2 p-2 rounded transition
               ${
-                isActive("/usuarios")
+                isActive("/dashboard/usuarios")
                   ? "bg-[var(--color-primary)]"
                   : "hover:bg-[var(--color-primary)]"
-              }
-              `}
+              }`}
             >
               <Users size={16} />
               Usuarios
             </Link>
 
             <Link
-              to="/roles"
+              to="/dashboard/roles"
               className={`flex items-center gap-2 p-2 rounded transition
               ${
-                isActive("/roles")
+                isActive("/dashboard/roles")
                   ? "bg-[var(--color-primary)]"
                   : "hover:bg-[var(--color-primary)]"
-              }
-              `}
+              }`}
             >
               <Shield size={16} />
               Roles
@@ -99,49 +131,51 @@ function Sidebar() {
           onClick={() => setOpenInventario(!openInventario)}
           className="flex items-center justify-between w-full p-2 rounded hover:bg-[var(--color-primary)]"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-3">
             <Package size={18} />
-            Inventario
+            {!collapsed && "Inventario"}
           </span>
 
-          <ChevronDown
-            size={16}
-            className={`transition ${openInventario ? "rotate-180" : ""}`}
-          />
+          {!collapsed && (
+            <ChevronDown
+              size={16}
+              className={`transition ${openInventario ? "rotate-180" : ""}`}
+            />
+          )}
         </button>
 
-        {openInventario && (
+        {openInventario && !collapsed && (
           <div className="ml-6 space-y-1">
             <Link
-              to="/categorias"
+              to="/dashboard/categorias"
               className="block p-2 rounded hover:bg-[var(--color-primary)]"
             >
               Categorías
             </Link>
 
             <Link
-              to="/activos"
+              to="/dashboard/activos"
               className="block p-2 rounded hover:bg-[var(--color-primary)]"
             >
               Activos
             </Link>
 
             <Link
-              to="/ubicaciones"
+              to="/dashboard/ubicaciones"
               className="block p-2 rounded hover:bg-[var(--color-primary)]"
             >
               Ubicaciones
             </Link>
 
             <Link
-              to="/movimientos"
+              to="/dashboard/movimientos"
               className="block p-2 rounded hover:bg-[var(--color-primary)]"
             >
               Movimientos
             </Link>
 
             <Link
-              to="/reportes/inventario"
+              to="/dashboard/reportes/inventario"
               className="block p-2 rounded hover:bg-[var(--color-primary)]"
             >
               Reportes
@@ -151,20 +185,22 @@ function Sidebar() {
 
         {/* CONTRATOS */}
         <Link
-          to="/contratos"
-          className="flex items-center gap-2 p-2 rounded hover:bg-[var(--color-primary)]"
+          to="/dashboard/contratos"
+          title="Contratos"
+          className="flex items-center gap-3 p-2 rounded hover:bg-[var(--color-primary)]"
         >
           <FileText size={18} />
-          Contratos
+          {!collapsed && "Contratos"}
         </Link>
 
-        {/* REPORTES GENERALES */}
+        {/* REPORTES */}
         <Link
-          to="/reportes"
-          className="flex items-center gap-2 p-2 rounded hover:bg-[var(--color-primary)]"
+          to="/dashboard/reportes"
+          title="Reportes"
+          className="flex items-center gap-3 p-2 rounded hover:bg-[var(--color-primary)]"
         >
           <BarChart3 size={18} />
-          Reportes
+          {!collapsed && "Reportes"}
         </Link>
       </nav>
     </aside>

@@ -42,35 +42,35 @@ export const router = createBrowserRouter([
             element: <DashboardPage />,
           },
           {
-            path: "/usuarios",
+            path: "usuarios",
             element: <UsersPage />,
           },
           {
-            path: "/roles",
+            path: "roles",
             element: <RolesPage />,
           },
           {
-            path: "/categorias",
+            path: "categorias",
             element: <CategoriasPage />,
           },
           {
-            path: "/activos",
+            path: "activos",
             element: <ActivosPage />,
           },
           {
-            path: "/activos/:id",
+            path: "activos/:id",
             element: <ActivoDetallePage />,
           },
           {
-            path: "/ubicaciones",
+            path: "ubicaciones",
             element: <UbicacionesPage />,
           },
           {
-            path: "/movimientos",
+            path: "movimientos",
             element: <MovimientosPage />,
           },
           {
-            path: "/reportes/inventario",
+            path: "reportes/inventario",
             element: <InventarioReportePage />,
           },
         ],
