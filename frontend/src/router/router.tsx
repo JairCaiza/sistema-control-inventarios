@@ -1,15 +1,15 @@
 import { createBrowserRouter } from "react-router-dom";
+
 import LoginPage from "../modules/auth/pages/LoginPage";
 import DashboardPage from "../modules/dashboard/pages/DashboardPage";
 import DashboardLayout from "../layouts/DashboardLayout";
 
-<<<<<<< Updated upstream
-export const router = createBrowserRouter([
-=======
 import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
+
 import UsersPage from "../modules/usuarios/pages/UsersPage";
 import RolesPage from "../modules/roles/pages/RolesPage";
+
 import CategoriasPage from "../modules/inventario/categorias/pages/CategoriasPage";
 import ActivosPage from "../modules/inventario/activos/pages/ActivosPage";
 import UbicacionesPage from "../modules/inventario/ubicaciones/pages/UbicacionesPage";
@@ -19,27 +19,28 @@ import InventarioReportePage from "../modules/inventario/reportes/pages/Inventar
 
 export const router = createBrowserRouter([
   /* RUTAS PUBLICAS */
->>>>>>> Stashed changes
   {
-    path: "/",
-    element: <LoginPage />,
-  },
-  {
-    path: "/dashboard",
-    element: <DashboardLayout />,
+    element: <PublicRoute />,
     children: [
       {
-<<<<<<< Updated upstream
-        index: true,
-        element: <DashboardPage />,
-=======
+        path: "/",
+        element: <LoginPage />,
+      },
+    ],
+  },
+
+  /* RUTAS PROTEGIDAS */
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: "/dashboard",
         element: <DashboardLayout />,
         children: [
           {
-            path: "/dashboard",
+            index: true,
             element: <DashboardPage />,
           },
-
           {
             path: "/usuarios",
             element: <UsersPage />,
@@ -53,27 +54,26 @@ export const router = createBrowserRouter([
             element: <CategoriasPage />,
           },
           {
-            path: "/ubicaciones",
-            element: <UbicacionesPage />,
-          },
-          {
             path: "/activos",
             element: <ActivosPage />,
-          },
-          {
-            path: "/movimientos",
-            element: <MovimientosPage />,
           },
           {
             path: "/activos/:id",
             element: <ActivoDetallePage />,
           },
           {
+            path: "/ubicaciones",
+            element: <UbicacionesPage />,
+          },
+          {
+            path: "/movimientos",
+            element: <MovimientosPage />,
+          },
+          {
             path: "/reportes/inventario",
             element: <InventarioReportePage />,
           },
         ],
->>>>>>> Stashed changes
       },
     ],
   },
