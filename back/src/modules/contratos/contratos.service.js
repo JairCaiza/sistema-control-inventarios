@@ -136,9 +136,37 @@ const agregarActivoContrato = async (contrato_id, data) => {
 
     }
 };
+const obtenerContratoPorId = async (id) => {
+    // 1️⃣ Traer contrato
+    const contratoResult = await pool.query(
+        `SELECT c.id, cl.nombre AS cliente, c.fecha_inicio, c.fecha_fin
+     FROM contratos_alquiler c
+     JOIN clientes cl ON cl.id = c.cliente_id
+     WHERE c.id = $1`,
+        [id]
+    );
 
+    if (contratoResult.rows.length === 0) {
+        throw new Error("Contrato no encontrado");
+    }
+
+    const contrato = contratoResult.rows[0];
+
+    // 2️⃣ Traer activos del contrato
+    const activosResult = await pool.query(
+        `SELECT a.id, a.nombre, dc.cantidad, dc.precio_diario AS precio_dia
+     FROM detalles_contrato dc
+     JOIN activos a ON dc.activo_id = a.id
+     WHERE dc.contrato_id = $1`,
+        [id]
+    );
+
+    contrato.activos = activosResult.rows;
+
+    return contrato;
+};
 
 module.exports = {
     crearContrato,
-    listarContratos, agregarActivoContrato
+    listarContratos, agregarActivoContrato, obtenerContratoPorId
 };
