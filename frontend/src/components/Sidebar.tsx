@@ -182,7 +182,15 @@ function Sidebar() {
             </Link>
           </div>
         )}
-
+        {/* CLIENTES */}
+        <Link
+          to="clientes"
+          title="Contratos"
+          className="flex items-center gap-3 p-2 rounded hover:bg-[var(--color-primary)]"
+        >
+          <FileText size={18} />
+          {!collapsed && "Clientes"}
+        </Link>
         {/* CONTRATOS */}
         <Link
           to="/dashboard/contratos"

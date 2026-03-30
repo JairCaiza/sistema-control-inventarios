@@ -16,6 +16,9 @@ import UbicacionesPage from "../modules/inventario/ubicaciones/pages/Ubicaciones
 import MovimientosPage from "../modules/inventario/movimientos/pages/MovimientosPage";
 import ActivoDetallePage from "../modules/inventario/activos/pages/ActivoDetallePage";
 import InventarioReportePage from "../modules/inventario/reportes/pages/InventarioReportePage";
+import ClientesPage from "../modules/clientes/pages/ClientesPage";
+import ContratosPage from "../modules/contratos/pages/ContratosPage";
+import ContratoDetallePage from "../modules/contratos/pages/ContratoDetallePage";
 
 export const router = createBrowserRouter([
   /* RUTAS PUBLICAS */
@@ -72,6 +75,18 @@ export const router = createBrowserRouter([
           {
             path: "reportes/inventario",
             element: <InventarioReportePage />,
+          },
+          {
+            path: "clientes",
+            element: <ClientesPage />,
+          },
+          {
+            path: "contratos",
+            element: <ContratosPage />,
+          },
+          {
+            path: "contratos/:id",
+            element: <ContratoDetallePage />,
           },
         ],
       },
