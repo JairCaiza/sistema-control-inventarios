@@ -1,5 +1,6 @@
 const { crearActivo, listarActivos, obtenerReporteInventario } = require("./activos.service");
 const PDFDocument = require("pdfkit");
+const ExcelJS = require("exceljs");
 const path = require("path");
 const { crearActivoSchema } = require("./activos.schema");
 
@@ -96,18 +97,19 @@ const exportarInventarioPDF = async (req, res, next) => {
 
         doc.moveDown(3);
 
-        /* CABECERA TABLA */
-
+        /* POSICION TABLA */
         const tableTop = 120;
 
+        /* CABECERA */
         doc.fontSize(12)
-            .text("Activo", 50, tableTop)
-            .text("Categoría", 200, tableTop)
-            .text("Ubicación", 350, tableTop)
-            .text("Stock", 500, tableTop);
+            .text("Código", 50, tableTop)
+            .text("Activo", 120, tableTop)
+            .text("Categoría", 260, tableTop)
+            .text("Ubicación", 400, tableTop)
+            .text("Stock", 520, tableTop);
 
         doc.moveTo(50, tableTop + 15)
-            .lineTo(550, tableTop + 15)
+            .lineTo(560, tableTop + 15)
             .stroke();
 
         /* FILAS */
@@ -117,10 +119,11 @@ const exportarInventarioPDF = async (req, res, next) => {
         data.forEach((item) => {
 
             doc.fontSize(10)
-                .text(item.activo, 50, y)
-                .text(item.categoria, 200, y)
-                .text(item.ubicacion, 350, y)
-                .text(item.stock.toString(), 500, y);
+                .text(item.codigo, 50, y)
+                .text(item.activo, 120, y)
+                .text(item.categoria, 260, y)
+                .text(item.ubicacion, 400, y)
+                .text(item.stock.toString(), 520, y);
 
             y += 20;
         });
@@ -131,10 +134,90 @@ const exportarInventarioPDF = async (req, res, next) => {
         next(error);
     }
 };
+const exportarInventarioExcel = async (req, res, next) => {
+    try {
 
+        const data = await obtenerReporteInventario();
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Inventario");
+
+        /* TITULO */
+
+        worksheet.mergeCells("A1:E1");
+        worksheet.getCell("A1").value = "REPORTE INVENTARIO GENERAL";
+        worksheet.getCell("A1").font = { size: 16, bold: true };
+        worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+        /* FECHA */
+
+        worksheet.mergeCells("A2:E2");
+        worksheet.getCell("A2").value = `Fecha: ${new Date().toLocaleDateString()}`;
+        worksheet.getCell("A2").alignment = { horizontal: "center" };
+
+        /* CABECERAS */
+
+        worksheet.columns = [
+            { header: "Código", key: "codigo", width: 15 },
+            { header: "Activo", key: "activo", width: 30 },
+            { header: "Categoría", key: "categoria", width: 25 },
+            { header: "Ubicación", key: "ubicacion", width: 25 },
+            { header: "Stock", key: "stock", width: 10 }
+        ];
+
+        /* ESTILO CABECERA */
+
+        worksheet.getRow(3).font = { bold: true };
+
+        /* FILAS */
+
+        data.forEach((item) => {
+            worksheet.addRow({
+                codigo: item.codigo,
+                activo: item.activo,
+                categoria: item.categoria,
+                ubicacion: item.ubicacion,
+                stock: item.stock
+            });
+        });
+
+        /* BORDES */
+
+        worksheet.eachRow((row) => {
+            row.eachCell((cell) => {
+                cell.border = {
+                    top: { style: "thin" },
+                    left: { style: "thin" },
+                    bottom: { style: "thin" },
+                    right: { style: "thin" }
+                };
+            });
+        });
+
+        /* HEADERS */
+
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+
+        res.setHeader(
+            "Content-Disposition",
+            "attachment; filename=reporte_inventario.xlsx"
+        );
+
+        await workbook.xlsx.write(res);
+
+        res.end();
+
+    } catch (error) {
+        next(error);
+    }
+};
 module.exports = {
     crear,
     listar,
     reporteInventario,
-    exportarInventarioPDF
+    exportarInventarioExcel,
+    exportarInventarioPDF,
 };
