@@ -24,49 +24,70 @@ function AddActivoContratoModal({
   onAgregado,
 }: Props) {
   const [activos, setActivos] = useState<Activo[]>([]);
+  const [loading, setLoading] = useState(false);
+
   const [form, setForm] = useState({
     activo_id: "",
     cantidad: 1,
-    precio_dia: 0,
+    precio_diario: 0, // ✅ corregido
   });
 
+  /* 📌 Cargar activos */
   useEffect(() => {
     const loadActivos = async () => {
-      const dataFromService = await getActivos();
+      try {
+        const dataFromService = await getActivos();
 
-      // Mapear para agregar cantidad_total (si viene de otra propiedad o por defecto 0)
-      const data: Activo[] = dataFromService.map((a) => ({
-        id: a.id,
-        nombre: a.nombre,
-        cantidad_total: a.cantidad_total ?? 0, // si tu backend lo llama distinto, ajústalo
-      }));
+        const data: Activo[] = dataFromService.map((a: any) => ({
+          id: a.id,
+          nombre: a.nombre,
+          cantidad_total: a.cantidad_total ?? 0,
+        }));
 
-      setActivos(data);
+        setActivos(data);
+      } catch (error) {
+        console.error("Error cargando activos", error);
+      }
     };
 
-    loadActivos();
-  }, []);
+    if (open) loadActivos();
+  }, [open]);
 
   if (!open) return null;
 
+  /* 📌 Manejo de inputs */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setForm({
       ...form,
-      [e.target.name]: e.target.value,
+      [e.target.name]:
+        e.target.name === "cantidad" || e.target.name === "precio_diario"
+          ? Number(e.target.value)
+          : e.target.value,
     });
   };
 
+  /* 📌 Submit */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    try {
-      await agregarActivoContrato(contratoId, {
-        activo_id: form.activo_id,
-        cantidad: Number(form.cantidad),
-        precio_dia: Number(form.precio_dia),
+    // 🔥 Validaciones
+    if (!form.activo_id || form.cantidad <= 0 || form.precio_diario < 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Datos inválidos",
+        text: "Complete correctamente los campos",
       });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      console.log("DATA ENVIADA:", form);
+
+      await agregarActivoContrato(contratoId, form);
 
       Swal.fire({
         icon: "success",
@@ -75,9 +96,18 @@ function AddActivoContratoModal({
         showConfirmButton: false,
       });
 
+      // 🔄 reset
+      setForm({
+        activo_id: "",
+        cantidad: 1,
+        precio_diario: 0,
+      });
+
       onAgregado();
       onClose();
     } catch (error: unknown) {
+      console.error(error);
+
       if (axios.isAxiosError(error)) {
         Swal.fire({
           icon: "error",
@@ -85,6 +115,8 @@ function AddActivoContratoModal({
           text: error.response?.data?.message ?? "No se pudo agregar el activo",
         });
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -94,8 +126,10 @@ function AddActivoContratoModal({
         <h2 className="text-xl font-bold mb-4">Agregar Activo</h2>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* 📌 Activo */}
           <select
             name="activo_id"
+            value={form.activo_id} // ✅ controlado
             onChange={handleChange}
             className="w-full border p-2 rounded"
           >
@@ -107,39 +141,47 @@ function AddActivoContratoModal({
             ))}
           </select>
 
+          {/* 📌 Cantidad */}
+          <label className="text-sm text-gray-600">Cantidad</label>
           <input
             type="number"
             min={1}
-            name="cantidad"
             placeholder="Cantidad"
+            name="cantidad"
             value={form.cantidad}
             onChange={handleChange}
             className="w-full border p-2 rounded"
           />
 
+          {/* 📌 Precio diario */}
+          <label className="text-sm text-gray-600">Precio diario ($)</label>
           <input
             type="number"
             min={0}
-            name="precio_dia"
-            placeholder="Precio por día"
-            value={form.precio_dia}
+            placeholder="Precio diario"
+            name="precio_diario" // ✅ corregido
+            value={form.precio_diario}
             onChange={handleChange}
             className="w-full border p-2 rounded"
           />
 
+          {/* 📌 Botones */}
           <div className="flex justify-end gap-2 pt-3">
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-2 border rounded"
+              disabled={loading}
             >
               Cancelar
             </button>
+
             <button
               type="submit"
+              disabled={loading}
               className="px-4 py-2 bg-[var(--color-primary)] text-white rounded"
             >
-              Guardar
+              {loading ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </form>
