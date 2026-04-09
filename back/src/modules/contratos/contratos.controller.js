@@ -77,7 +77,21 @@ const agregarActivo = async (req, res, next) => {
 
 };
 
+const obtener = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const contrato = await contratosService.obtenerContratoPorId(id);
+
+        res.json({
+            success: true,
+            data: contrato,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     crear,
-    listar, agregarActivo
+    listar, agregarActivo, obtener
 };
