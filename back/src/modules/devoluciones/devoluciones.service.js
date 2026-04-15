@@ -84,7 +84,31 @@ const registrar = async (data) => {
         client.release();
     }
 };
+const listar = async () => {
+    const res = await pool.query(`
+        SELECT d.*, c.numero_contrato, cl.nombre AS cliente
+        FROM devoluciones d
+        JOIN contratos_alquiler c ON c.id = d.contrato_id
+        JOIN clientes cl ON cl.id = c.cliente_id
+        ORDER BY d.fecha_devolucion DESC
+    `);
 
+    return res.rows;
+};
+
+const obtenerPorId = async (id) => {
+    const res = await pool.query(`
+        SELECT d.*, c.numero_contrato, cl.nombre AS cliente
+        FROM devoluciones d
+        JOIN contratos_alquiler c ON c.id = d.contrato_id
+        JOIN clientes cl ON cl.id = c.cliente_id
+        WHERE d.id = $1
+    `, [id]);
+
+    return res.rows[0];
+};
 module.exports = {
-    registrar
+    registrar,
+    listar,
+    obtenerPorId
 };

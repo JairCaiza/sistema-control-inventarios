@@ -26,7 +26,36 @@ const registrar = async (req, res, next) => {
         next(error);
     }
 };
+const listar = async (req, res, next) => {
+    try {
+        const data = await devolucionesService.listar();
 
+        res.json({
+            success: true,
+            data
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+const obtenerPorId = async (req, res, next) => {
+    try {
+        const data = await devolucionesService.obtenerPorId(req.params.id);
+
+        res.json({
+            success: true,
+            data
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
 module.exports = {
-    registrar
+    registrar,
+    listar,
+    obtenerPorId
+
 };
