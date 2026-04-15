@@ -13,6 +13,7 @@ const activosRoutes = require("./modules/inventarios/activos/activos.routes");
 const movimientosRoutes = require("./modules/inventarios/movimientos/movimientos.routes");
 const clientesRoutes = require("./modules/clientes/clientes.routes");
 const contratosRoutes = require("./modules/contratos/contratos.routes");
+const devolucionesRoutes = require("./modules/devoluciones/devoluciones.routes");
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/activos", activosRoutes);
 app.use("/api/movimientos", movimientosRoutes);
 app.use("/api/clientes", clientesRoutes);
 app.use("/api/contratos", contratosRoutes);
+app.use("/api/devoluciones", devolucionesRoutes);
 
 /* =========================
    MIDDLEWARE DE ERRORES
