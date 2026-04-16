@@ -19,6 +19,7 @@ import InventarioReportePage from "../modules/inventario/reportes/pages/Inventar
 import ClientesPage from "../modules/clientes/pages/ClientesPage";
 import ContratosPage from "../modules/contratos/pages/ContratosPage";
 import ContratoDetallePage from "../modules/contratos/pages/ContratoDetallePage";
+import DevolucionesPage from "../modules/devoluciones/pages/DevolucionesPage";
 
 export const router = createBrowserRouter([
   /* RUTAS PUBLICAS */
@@ -87,6 +88,10 @@ export const router = createBrowserRouter([
           {
             path: "contratos/:id",
             element: <ContratoDetallePage />,
+          },
+          {
+            path: "devoluciones",
+            element: <DevolucionesPage />,
           },
         ],
       },

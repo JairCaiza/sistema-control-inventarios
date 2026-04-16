@@ -203,12 +203,12 @@ function Sidebar() {
 
         {/* REPORTES */}
         <Link
-          to="/dashboard/reportes"
+          to="/dashboard/devoluciones"
           title="Reportes"
           className="flex items-center gap-3 p-2 rounded hover:bg-[var(--color-primary)]"
         >
           <BarChart3 size={18} />
-          {!collapsed && "Reportes"}
+          {!collapsed && "Devoluciones"}
         </Link>
       </nav>
     </aside>
