@@ -1,4 +1,5 @@
 const { pool } = require("../../config/db");
+const notasService = require("../notas/notas.service");
 
 const registrar = async (data) => {
     const client = await pool.connect();
@@ -9,8 +10,8 @@ const registrar = async (data) => {
         /* 1️⃣ Obtener contrato */
         const contratoRes = await client.query(
             `SELECT id, fecha_fin
-       FROM contratos_alquiler
-       WHERE id = $1`,
+             FROM contratos_alquiler
+             WHERE id = $1`,
             [data.contrato_id]
         );
 
@@ -31,17 +32,15 @@ const registrar = async (data) => {
             dias_retraso = Math.ceil(diff / (1000 * 60 * 60 * 24));
         }
 
-        /* 3️⃣ Calcular penalidad */
-        // 🔥 Aquí debes ajustar según tu lógica real
-        // Ejemplo: sumar todos los activos del contrato
-
+        /* 3️⃣ Obtener activos del contrato */
         const activosRes = await client.query(
-            `SELECT cantidad, precio_diario
-       FROM detalles_contrato
-       WHERE contrato_id = $1`,
+            `SELECT activo_id, cantidad, precio_diario
+             FROM detalles_contrato
+             WHERE contrato_id = $1`,
             [data.contrato_id]
         );
 
+        /* 4️⃣ Calcular penalidad */
         let penalidad_total = 0;
 
         if (dias_retraso > 0) {
@@ -51,12 +50,12 @@ const registrar = async (data) => {
             });
         }
 
-        /* 4️⃣ Insertar devolución */
+        /* 5️⃣ Insertar devolución */
         const insertRes = await client.query(
             `INSERT INTO devoluciones
-       (contrato_id, fecha_devolucion, dias_retraso, penalidad_total)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
+             (contrato_id, fecha_devolucion, dias_retraso, penalidad_total)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
             [
                 data.contrato_id,
                 data.fecha_devolucion,
@@ -65,12 +64,67 @@ const registrar = async (data) => {
             ]
         );
 
-        /* 5️⃣ Actualizar estado contrato */
+        /* 6️⃣ Actualizar estado contrato */
         await client.query(
             `UPDATE contratos_alquiler
-       SET estado = 'finalizado'
-       WHERE id = $1`,
+             SET estado = 'finalizado'
+             WHERE id = $1`,
             [data.contrato_id]
+        );
+
+        /* 🔥 7️⃣ DEVOLVER STOCK (HU-25) */
+        for (const a of activosRes.rows) {
+            await client.query(
+                `UPDATE activos
+                 SET cantidad_total = cantidad_total + $1,
+                     estado = 'disponible'
+                 WHERE id = $2`,
+                [a.cantidad, a.activo_id]
+            );
+
+            await client.query(
+                `INSERT INTO movimientos_inventario
+                 (activo_id, tipo_movimiento, cantidad, motivo)
+                 VALUES ($1, 'entrada', $2, 'Devolución contrato')`,
+                [a.activo_id, a.cantidad]
+            );
+        }
+
+        /* 🔥 8️⃣ CREAR NOTA DE VENTA */
+        const totalContratoRes = await client.query(
+            `SELECT total, cliente_id
+             FROM contratos_alquiler
+             WHERE id = $1`,
+            [data.contrato_id]
+        );
+
+        const contratoData = totalContratoRes.rows[0];
+
+        const totalContrato = Number(contratoData.total);
+
+        const detalles = [
+            {
+                descripcion: "Alquiler de equipos",
+                cantidad: 1,
+                precio_unitario: totalContrato
+            }
+        ];
+
+        if (penalidad_total > 0) {
+            detalles.push({
+                descripcion: "Penalidad por retraso",
+                cantidad: 1,
+                precio_unitario: penalidad_total
+            });
+        }
+
+        await notasService.crear(
+            {
+                cliente_id: contratoData.cliente_id,
+                metodo_pago: data.metodo_pago,
+                detalles
+            },
+            client // 🔥 usar misma transacción
         );
 
         await client.query("COMMIT");
@@ -84,6 +138,7 @@ const registrar = async (data) => {
         client.release();
     }
 };
+
 const listar = async () => {
     const res = await pool.query(`
         SELECT d.*, c.numero_contrato, cl.nombre AS cliente
@@ -107,6 +162,7 @@ const obtenerPorId = async (id) => {
 
     return res.rows[0];
 };
+
 module.exports = {
     registrar,
     listar,
