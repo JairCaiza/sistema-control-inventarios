@@ -1,5 +1,5 @@
 const { pool } = require("../../config/db");
-const notasService = require("../notas/notas.service");
+const notasService = require("../ventas/notas/notas.service");
 
 const registrar = async (data) => {
     const client = await pool.connect();
@@ -64,6 +64,8 @@ const registrar = async (data) => {
             ]
         );
 
+        const devolucion = insertRes.rows[0];
+
         /* 6️⃣ Actualizar estado contrato */
         await client.query(
             `UPDATE contratos_alquiler
@@ -72,7 +74,7 @@ const registrar = async (data) => {
             [data.contrato_id]
         );
 
-        /* 🔥 7️⃣ DEVOLVER STOCK (HU-25) */
+        /* 🔥 7️⃣ DEVOLVER STOCK */
         for (const a of activosRes.rows) {
             await client.query(
                 `UPDATE activos
@@ -118,18 +120,30 @@ const registrar = async (data) => {
             });
         }
 
-        await notasService.crear(
+        const nota = await notasService.crear(
             {
                 cliente_id: contratoData.cliente_id,
                 metodo_pago: data.metodo_pago,
                 detalles
             },
-            client // 🔥 usar misma transacción
+            client
+        );
+
+        /* 🔥 9️⃣ GUARDAR RELACIÓN DEVOLUCIÓN - NOTA */
+        await client.query(
+            `UPDATE devoluciones
+             SET nota_id = $1
+             WHERE id = $2`,
+            [nota.id, devolucion.id]
         );
 
         await client.query("COMMIT");
 
-        return insertRes.rows[0];
+        /* 🔥 10️⃣ RETORNAR TODO */
+        return {
+            ...devolucion,
+            nota_id: nota.id
+        };
 
     } catch (error) {
         await client.query("ROLLBACK");

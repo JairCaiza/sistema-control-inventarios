@@ -78,20 +78,19 @@ const obtenerPorId = async (req, res, next) => {
 /* =========================
    🧾 PDF REAL (HU-28)
 ========================= */
-const generarPDF = async (req, res, next) => {
+const generarPDF = async (req, res) => {
     try {
-        const nota = await notasService.obtenerConDetalles(req.params.id);
+        const { id } = req.params;
+
+        const nota = await notasService.obtenerConDetalles(id);
 
         if (!nota) {
-            return res.status(404).json({
-                success: false,
-                message: "Nota no encontrada"
-            });
+            return res.status(404).json({ message: "Nota no encontrada" });
         }
 
         const doc = new PDFDocument({
-            size: [226, 600], // tamaño ticket
-            margin: 10
+            size: [226, 800], // 🔥 formato ticket
+            margin: 10,
         });
 
         res.setHeader("Content-Type", "application/pdf");
@@ -102,73 +101,116 @@ const generarPDF = async (req, res, next) => {
 
         doc.pipe(res);
 
-        /* 🏢 ENCABEZADO */
+        /* =========================
+           🟢 CABECERA
+        ========================= */
         doc
-            .fontSize(12)
-            .text("HNOS GUARACA", { align: "center" });
-
-        doc
-            .fontSize(8)
+            .fontSize(10)
+            .text("HNOS GUARACA", { align: "center" })
             .text("Alquiler y Venta de Equipos", { align: "center" })
             .text("RUC: 1234567890001", { align: "center" })
             .text("Tel: 0999999999", { align: "center" });
 
         doc.moveDown(0.5);
-        doc.text("--------------------------------", { align: "center" });
 
-        /* 📄 INFO */
         doc
-            .fontSize(8)
+            .fontSize(9)
             .text(`Nota: ${nota.numero}`)
             .text(`Fecha: ${new Date(nota.fecha).toLocaleDateString()}`)
-            .text(`Cliente: ${nota.cliente || "Consumidor Final"}`);
+            .text(`Cliente: ${nota.cliente}`);
 
-        doc.moveDown(0.5);
-        doc.text("--------------------------------");
+        doc.moveDown();
 
-        /* 📦 DETALLES */
-        doc.fontSize(8).text("DESCRIPCIÓN");
+        /* =========================
+           🔵 TABLA
+        ========================= */
 
+        const startX = 10;
+        let y = doc.y;
+
+        // Encabezado
+        doc.fontSize(8);
+        doc.text("Cant", startX, y);
+        doc.text("Desc", startX + 35, y);
+        doc.text("P.Unit", startX + 110, y);
+        doc.text("Total", startX + 160, y);
+
+        y += 10;
+
+        // Línea header
+        doc.moveTo(startX, y).lineTo(210, y).stroke();
+
+        y += 5;
+
+        /* FILAS */
         nota.detalles.forEach((d) => {
-            doc
-                .text(`${d.descripcion}`)
-                .text(
-                    `${d.cantidad} x ${Number(d.precio_unitario).toFixed(2)} = ${Number(d.subtotal).toFixed(2)}`,
-                    { align: "right" }
-                );
+            const precio = Number(d.precio_unitario) || 0;
+            const cantidad = Number(d.cantidad) || 0;
+            const subtotal = cantidad * precio;
+
+            doc.fontSize(8);
+
+            doc.text(cantidad, startX, y);
+            doc.text(d.descripcion, startX + 35, y, { width: 70 });
+            doc.text(precio.toFixed(2), startX + 110, y);
+            doc.text(subtotal.toFixed(2), startX + 160, y);
+
+            y += 15;
+
+            // Línea por fila
+            doc.moveTo(startX, y).lineTo(210, y).stroke();
+            y += 5;
         });
 
-        doc.moveDown(0.5);
-        doc.text("--------------------------------");
+        /* =========================
+           🔴 TOTAL
+        ========================= */
+        doc.moveDown();
 
-        /* 💰 TOTAL */
         doc
             .fontSize(10)
             .text(`TOTAL: $${Number(nota.total).toFixed(2)}`, {
-                align: "right"
+                align: "right",
             });
 
-        doc.moveDown(0.5);
+        doc.moveDown(2);
 
-        /* 💳 PAGO */
+        /* =========================
+           ✍️ FIRMAS
+        ========================= */
+        doc.fontSize(8);
+
+        const yFirmas = doc.y; // 🔥 misma altura para ambos
+
+        // Línea izquierda
+        doc.text("____________________", 10, yFirmas);
+        doc.text("Cliente", 10, yFirmas + 12);
+
+        // Línea derecha
+        doc.text("____________________", 110, yFirmas);
+        doc.text("Responsable", 110, yFirmas + 12);
+
+        doc.moveDown(2);
+
+        /* =========================
+           💚 MENSAJE FINAL
+        ========================= */
         doc
-            .fontSize(8)
-            .text("Método de pago:")
-            .text(nota.metodo_pago.toUpperCase());
-
-        doc.moveDown(1);
-
-        /* 🙏 FOOTER */
-        doc
-            .fontSize(8)
-            .text("¡GRACIAS POR SU COMPRA!", { align: "center" });
-
-        doc.text("--------------------------------", { align: "center" });
+            .fontSize(9)
+            .text("¡Gracias por preferirnos!", {
+                align: "center",
+            });
 
         doc.end();
 
     } catch (error) {
-        next(error);
+        console.error("🔥 Error PDF:", error);
+
+        if (!res.headersSent) {
+            res.status(500).json({
+                message: "Error generando PDF",
+            });
+        }
     }
 };
 
