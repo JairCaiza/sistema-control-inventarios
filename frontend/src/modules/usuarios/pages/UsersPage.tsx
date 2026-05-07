@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getUsers } from "../services/userService";
+import { getUsers, toggleUserStatus } from "../services/userService";
 
 import {
   flexRender,
@@ -13,6 +13,7 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 
 import CreateUserModal from "../components/CreateUserModal";
+import EditUserModal from "../components/EditUserModal";
 
 interface User {
   id: string;
@@ -20,6 +21,7 @@ interface User {
   apellido: string;
   correo: string;
   rol: string;
+  rol_id: string;
   activo: boolean;
 }
 
@@ -27,6 +29,8 @@ function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const loadUsers = async () => {
     const data = await getUsers();
@@ -68,19 +72,56 @@ function UsersPage() {
       {
         header: "Acciones",
         cell: ({ row }) => (
-          <div className="flex gap-3 text-sm">
-            <button className="text-blue-600">Ver</button>
-            <button className="text-orange-600">Editar</button>
+          <div className="flex items-center gap-4">
+            {/* EDITAR */}
             <button
-              className="text-red-600"
+              className="text-blue-600"
               onClick={() => {
-                if (confirm("¿Desactivar usuario?")) {
-                  console.log("desactivar", row.original.id);
-                }
+                setSelectedUser(row.original);
+                setEditOpen(true);
               }}
             >
-              Desactivar
+              Editar
             </button>
+
+            {/* SWITCH ACTIVAR/DESACTIVAR */}
+            <label className="inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={row.original.activo}
+                onChange={async () => {
+                  try {
+                    const nuevoEstado = !row.original.activo;
+
+                    console.log("CLICK SWITCH USER:", row.original);
+                    console.log(
+                      nuevoEstado ? "ACTIVANDO..." : "DESACTIVANDO...",
+                    );
+
+                    const res = await toggleUserStatus(
+                      row.original.id,
+                      nuevoEstado,
+                    );
+
+                    console.log("RESPUESTA:", res);
+
+                    await loadUsers();
+                  } catch (error: any) {
+                    console.error("ERROR COMPLETO:", error);
+
+                    if (error.response) {
+                      console.error("STATUS:", error.response.status);
+                      console.error("DATA:", error.response.data);
+                    }
+                  }
+                }}
+                className="sr-only peer"
+              />
+
+              <div className="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-500 relative transition">
+                <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+              </div>
+            </label>
           </div>
         ),
       },
@@ -104,7 +145,6 @@ function UsersPage() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Usuarios</h1>
 
@@ -117,7 +157,6 @@ function UsersPage() {
       </div>
 
       {/* BUSCADOR */}
-
       <input
         placeholder="Buscar usuario..."
         value={globalFilter}
@@ -126,7 +165,6 @@ function UsersPage() {
       />
 
       {/* TABLA */}
-
       <div className="bg-white rounded-lg shadow border overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50">
@@ -163,7 +201,6 @@ function UsersPage() {
       </div>
 
       {/* PAGINACIÓN */}
-
       <div className="flex gap-2">
         <button
           onClick={() => table.previousPage()}
@@ -182,12 +219,19 @@ function UsersPage() {
         </button>
       </div>
 
-      {/* MODAL */}
-
+      {/* MODALES */}
       <CreateUserModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={loadUsers}
+      />
+
+      <EditUserModal
+        key={selectedUser?.id}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onUpdated={loadUsers}
+        user={selectedUser}
       />
     </div>
   );

@@ -12,7 +12,8 @@ const updateUserSchema = Joi.object({
     nombre: Joi.string().min(3).max(100).optional(),
     apellido: Joi.string().min(3).max(100).optional(),
     correo: Joi.string().email().optional(),
-    activo: Joi.boolean().optional()
+    activo: Joi.boolean().optional(),
+    rol_id: Joi.string().uuid().optional()
 });
 
 module.exports = {

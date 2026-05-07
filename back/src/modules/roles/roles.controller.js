@@ -1,6 +1,9 @@
 const rolesService = require("./roles.service");
 const { createRoleSchema, updateRoleSchema } = require("./roles.schema");
 
+/* =========================
+   CREAR ROL
+========================= */
 const createRole = async (req, res) => {
     try {
         const { error } = createRoleSchema.validate(req.body);
@@ -20,6 +23,9 @@ const createRole = async (req, res) => {
     }
 };
 
+/* =========================
+   LISTAR ROLES
+========================= */
 const getRoles = async (req, res) => {
     try {
         const roles = await rolesService.getRoles();
@@ -34,6 +40,9 @@ const getRoles = async (req, res) => {
     }
 };
 
+/* =========================
+   ACTUALIZAR ROL
+========================= */
 const updateRole = async (req, res) => {
     try {
         const { error } = updateRoleSchema.validate(req.body);
@@ -53,17 +62,53 @@ const updateRole = async (req, res) => {
     }
 };
 
-const deactivateRole = async (req, res) => {
+/* =========================
+   ACTIVAR / DESACTIVAR ROL
+========================= */
+const toggleRoleStatus = async (req, res) => {
     try {
-        const role = await rolesService.deactivateRole(req.params.id);
+        const { id } = req.params;
+        const { activo } = req.body || {};
+
+        if (typeof activo !== "boolean") {
+            return res.status(400).json({
+                message: "Campo 'activo' es requerido y debe ser boolean",
+            });
+        }
+
+        const role = await rolesService.toggleRoleStatus(id, activo);
+
+        return res.json({
+            success: true,
+            data: role,
+        });
+
+    } catch (error) {
+        console.error("ERROR TOGGLE:", error); // 🔥 IMPORTANTE
+        return res.status(500).json({
+            message: error.message,
+        });
+    }
+};
+/* =========================
+   ELIMINAR ROL (VALIDADO)
+========================= */
+const deleteRole = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const role = await rolesService.deleteRole(id);
 
         res.json({
             success: true,
+            message: "Rol eliminado correctamente",
             data: role
         });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(400).json({
+            message: error.message
+        });
     }
 };
 
@@ -71,5 +116,6 @@ module.exports = {
     createRole,
     getRoles,
     updateRole,
-    deactivateRole
+    toggleRoleStatus,
+    deleteRole
 };

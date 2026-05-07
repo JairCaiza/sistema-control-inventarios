@@ -114,28 +114,25 @@ const actualizar = async (req, res) => {
 
 
 const eliminar = async (req, res) => {
-
     try {
-
         const ubicacion = await eliminarUbicacion(req.params.id);
 
         if (!ubicacion) {
             return res.status(404).json({
                 success: false,
-                message: "Ubicación no encontrada"
+                message: "Ubicación no encontrada",
             });
         }
 
         res.json({
             success: true,
-            message: "Ubicación eliminada correctamente"
+            message: "Ubicación eliminada correctamente",
         });
 
     } catch (error) {
-
-        res.status(500).json({
+        res.status(400).json({
             success: false,
-            message: error.message
+            message: error.message,
         });
     }
 };

@@ -2,6 +2,7 @@ const { crearCategoria } = require("./categorias.service");
 const { crearCategoriaSchema } = require("./categorias.schema");
 const { listarCategorias } = require("./categorias.service");
 const { actualizarCategoria } = require("./categorias.service");
+const { toggleCategoriaStatus } = require("./categorias.service");
 const { actualizarCategoriaSchema } = require("./categorias.schema");
 const { eliminarCategoria } = require("./categorias.service");
 
@@ -114,6 +115,50 @@ const eliminar = async (req, res) => {
         });
 
     } catch (error) {
+
+        if (error.message.includes("No se puede eliminar")) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+
+const toggleCategoriaStatusController = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!req.body) {
+            return res.status(400).json({
+                success: false,
+                message: "Body vacío",
+            });
+        }
+
+        const { activo } = req.body;
+
+        if (typeof activo === "undefined") {
+            return res.status(400).json({
+                success: false,
+                message: "Campo 'activo' es requerido",
+            });
+        }
+
+        const categoria = await toggleCategoriaStatus(id, activo);
+
+        res.json({
+            success: true,
+            data: categoria,
+        });
+
+    } catch (error) {
         res.status(500).json({
             success: false,
             message: error.message,
@@ -121,5 +166,5 @@ const eliminar = async (req, res) => {
     }
 };
 module.exports = {
-    crearCategorias, obtenerCategorias, actualizar, eliminar
+    crearCategorias, obtenerCategorias, actualizar, eliminar, toggleCategoriaStatusController
 };

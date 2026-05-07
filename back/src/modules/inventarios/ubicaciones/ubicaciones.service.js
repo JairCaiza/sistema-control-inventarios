@@ -42,6 +42,21 @@ const actualizarUbicacion = async (id, { nombre, descripcion }) => {
 
 const eliminarUbicacion = async (id) => {
 
+    // 🔍 1. VALIDAR RELACIÓN CON ACTIVOS
+    const check = await pool.query(
+        `SELECT COUNT(*) 
+         FROM activos 
+         WHERE ubicacion_id = $1`,
+        [id]
+    );
+
+    const count = parseInt(check.rows[0].count);
+
+    if (count > 0) {
+        throw new Error("No se puede eliminar la ubicación porque está asignada a activos");
+    }
+
+    // 🗑 2. ELIMINAR SI NO TIENE RELACIÓN
     const result = await pool.query(
         `DELETE FROM ubicaciones
          WHERE id = $1

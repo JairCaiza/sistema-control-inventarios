@@ -58,6 +58,8 @@ CREATE TABLE categorias (
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE(nombre, tipo)
 );
+ALTER TABLE categorias
+ADD COLUMN activo BOOLEAN DEFAULT true;
 
 CREATE TABLE ubicaciones (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -272,3 +274,8 @@ CREATE TABLE distribuciones_utilidades (
     fecha_pago DATE,
     FOREIGN KEY (socio_id) REFERENCES socios(id)
 );
+ALTER TABLE activos
+ADD COLUMN marca VARCHAR(100),
+ADD COLUMN color VARCHAR(50),
+ADD COLUMN responsable VARCHAR(150),
+ADD COLUMN observaciones TEXT;

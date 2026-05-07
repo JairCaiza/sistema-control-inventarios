@@ -32,6 +32,21 @@ const actualizarCategoria = async (id, { nombre, tipo }) => {
     return result.rows[0];
 };
 const eliminarCategoria = async (id) => {
+    // validar relación con activos
+    const check = await pool.query(
+        `SELECT COUNT(*) 
+         FROM activos 
+         WHERE categoria_id = $1`,
+        [id]
+    );
+
+    const count = parseInt(check.rows[0].count);
+
+    if (count > 0) {
+        throw new Error("No se puede eliminar la categoría porque está en uso");
+    }
+
+    // soft delete
     const result = await pool.query(
         `UPDATE categorias
          SET activo = false
@@ -42,6 +57,17 @@ const eliminarCategoria = async (id) => {
 
     return result.rows[0];
 };
+const toggleCategoriaStatus = async (id, activo) => {
+    const result = await pool.query(
+        `UPDATE categorias
+         SET activo = $1
+         WHERE id = $2
+         RETURNING *`,
+        [activo, id]
+    );
+
+    return result.rows[0];
+};
 module.exports = {
-    crearCategoria, listarCategorias, actualizarCategoria, eliminarCategoria
+    crearCategoria, listarCategorias, actualizarCategoria, eliminarCategoria, toggleCategoriaStatus
 };

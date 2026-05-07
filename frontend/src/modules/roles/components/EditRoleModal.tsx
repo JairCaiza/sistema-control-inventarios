@@ -1,25 +1,40 @@
-import { useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import { createCategoria } from "../services/categoriaService";
+import axios from "axios";
+import { updateRole } from "../services/roleService";
+
+interface Role {
+  id: string;
+  nombre: string;
+  descripcion: string;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onUpdated: () => void;
+  role: Role | null;
 }
 
-function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
+function EditRoleModal({ open, onClose, onUpdated, role }: Props) {
   const [form, setForm] = useState({
     nombre: "",
-    tipo: "", // 🔥 CORRECTO
+    descripcion: "",
   });
 
-  if (!open) return null;
+  /* 🔥 CARGAR DATOS DEL ROL */
+  useEffect(() => {
+    if (role) {
+      setForm({
+        nombre: role.nombre,
+        descripcion: role.descripcion,
+      });
+    }
+  }, [role]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
+  if (!open || !role) return null;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({
       ...form,
       [e.target.name]: e.target.value,
@@ -30,53 +45,49 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
     e.preventDefault();
 
     try {
-      await createCategoria(form);
+      await updateRole(role.id, form);
 
       Swal.fire({
         icon: "success",
-        title: "Categoría creada",
-        timer: 1500,
+        title: "Rol actualizado",
+        timer: 2000,
         showConfirmButton: false,
       });
 
-      onCreated();
+      onUpdated();
       onClose();
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response?.data?.message ?? "Error al crear categoría",
+          text: error.response?.data?.message ?? "Error al actualizar rol",
         });
       }
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white w-[420px] rounded-lg shadow-xl p-6">
-        <h2 className="text-xl font-bold mb-4">Nueva Categoría</h2>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+      <div className="bg-white w-[400px] rounded-lg p-6">
+        <h2 className="text-xl font-bold mb-4">Editar Rol</h2>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* NOMBRE */}
           <input
             name="nombre"
-            placeholder="Nombre de la categoría"
+            value={form.nombre}
             onChange={handleChange}
+            placeholder="Nombre del rol"
             className="w-full border p-2 rounded"
           />
 
-          {/* 🔥 TIPO (SELECT MEJOR UX) */}
-          <select
-            name="tipo"
+          <input
+            name="descripcion"
+            value={form.descripcion}
             onChange={handleChange}
+            placeholder="Descripción"
             className="w-full border p-2 rounded"
-          >
-            <option value="">Seleccione tipo</option>
-            <option value="equipo">Equipo</option>
-            <option value="herramienta">Herramienta</option>
-            <option value="encofrado">Encofrado</option>
-          </select>
+          />
 
           <div className="flex justify-end gap-2 pt-3">
             <button
@@ -91,7 +102,7 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
               type="submit"
               className="px-4 py-2 bg-[var(--color-primary)] text-white rounded"
             >
-              Guardar
+              Actualizar
             </button>
           </div>
         </form>
@@ -100,4 +111,4 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
   );
 }
 
-export default CreateCategoriaModal;
+export default EditRoleModal;

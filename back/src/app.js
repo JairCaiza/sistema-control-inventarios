@@ -18,8 +18,24 @@ const notasRoutes = require("./modules/ventas/notas/notas.routes");
 
 const app = express();
 
-app.use(cors());
 app.use(express.json());
+
+/* =========================
+   CORS (CORREGIDO)
+========================= */
+app.use(cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// 🔥 IMPORTANTE: SOLO ESTE middleware (NO duplicar headers)
+app.use((req, res, next) => {
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+    }
+    next();
+});
 
 /* =========================
    RUTAS
@@ -30,6 +46,7 @@ app.get("/api/test", protect, (req, res) => {
         user: req.user,
     });
 });
+
 app.get(
     "/api/admin-only",
     protect,
@@ -40,6 +57,7 @@ app.get(
         });
     }
 );
+
 app.use('/api/auth', authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/roles", rolesRoutes);
@@ -53,9 +71,8 @@ app.use("/api/devoluciones", devolucionesRoutes);
 app.use("/api/notas", notasRoutes);
 
 /* =========================
-   MIDDLEWARE DE ERRORES
+   ERROR HANDLER
 ========================= */
-
 app.use(errorHandler);
 
 module.exports = app;

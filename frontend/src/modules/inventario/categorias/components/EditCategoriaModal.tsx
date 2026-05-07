@@ -1,22 +1,45 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { createCategoria } from "../services/categoriaService";
+import { updateCategoria } from "../services/categoriaService";
+
+interface Categoria {
+  id: string;
+  nombre: string;
+  tipo: string;
+  activo: boolean;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onUpdated: () => void;
+  categoria: Categoria | null;
 }
 
-function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
+function EditCategoriaModal({ open, onClose, onUpdated, categoria }: Props) {
   const [form, setForm] = useState({
     nombre: "",
-    tipo: "", // 🔥 CORRECTO
+    tipo: "equipo",
   });
 
-  if (!open) return null;
+  /* =========================
+     CARGAR DATOS AL ABRIR
+  ========================= */
+  useEffect(() => {
+    if (categoria) {
+      setForm({
+        nombre: categoria.nombre,
+        tipo: categoria.tipo,
+      });
+    }
+  }, [categoria]);
 
+  if (!open || !categoria) return null;
+
+  /* =========================
+     HANDLE CHANGE
+  ========================= */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -26,27 +49,31 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
     });
   };
 
+  /* =========================
+     SUBMIT
+  ========================= */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      await createCategoria(form);
+      await updateCategoria(categoria.id, form);
 
       Swal.fire({
         icon: "success",
-        title: "Categoría creada",
+        title: "Categoría actualizada",
         timer: 1500,
         showConfirmButton: false,
       });
 
-      onCreated();
+      onUpdated();
       onClose();
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response?.data?.message ?? "Error al crear categoría",
+          text:
+            error.response?.data?.message || "Error al actualizar categoría",
         });
       }
     }
@@ -55,29 +82,31 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white w-[420px] rounded-lg shadow-xl p-6">
-        <h2 className="text-xl font-bold mb-4">Nueva Categoría</h2>
+        <h2 className="text-xl font-bold mb-4">Editar Categoría</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* NOMBRE */}
           <input
             name="nombre"
-            placeholder="Nombre de la categoría"
+            value={form.nombre}
             onChange={handleChange}
+            placeholder="Nombre de la categoría"
             className="w-full border p-2 rounded"
           />
 
-          {/* 🔥 TIPO (SELECT MEJOR UX) */}
+          {/* 🔥 TIPO (SELECT CORRECTO) */}
           <select
             name="tipo"
+            value={form.tipo}
             onChange={handleChange}
             className="w-full border p-2 rounded"
           >
-            <option value="">Seleccione tipo</option>
             <option value="equipo">Equipo</option>
             <option value="herramienta">Herramienta</option>
             <option value="encofrado">Encofrado</option>
           </select>
 
+          {/* BOTONES */}
           <div className="flex justify-end gap-2 pt-3">
             <button
               type="button"
@@ -91,7 +120,7 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
               type="submit"
               className="px-4 py-2 bg-[var(--color-primary)] text-white rounded"
             >
-              Guardar
+              Actualizar
             </button>
           </div>
         </form>
@@ -100,4 +129,4 @@ function CreateCategoriaModal({ open, onClose, onCreated }: Props) {
   );
 }
 
-export default CreateCategoriaModal;
+export default EditCategoriaModal;
