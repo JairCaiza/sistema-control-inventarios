@@ -9,7 +9,7 @@ const {
     obtenerCategorias,
     actualizar,
     eliminar,
-    toggleCategoriaStatus, // 🔥 NUEVO
+    toggleCategoriaStatusController, // 🔥 NUEVO
 } = require("./categorias.controller");
 
 /* =========================
@@ -44,7 +44,7 @@ router.put(
     "/:id/status",
     protect,
     authorizeRoles("Administrador"),
-    toggleCategoriaStatus
+    toggleCategoriaStatusController
 );
 
 // ✅ Eliminar (soft delete validado)
