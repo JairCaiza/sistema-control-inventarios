@@ -8,12 +8,16 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  contratoId: string;
+  contratoId?: string;
 }
 
-function RegistrarDevolucionModal({ open, onClose, onSuccess }: Props) {
+function RegistrarDevolucionModal({
+  open,
+  onClose,
+  onSuccess,
+  contratoId: contratoIdProp,
+}: Props) {
   const [loading, setLoading] = useState(false);
-  const [metodoPago, setMetodoPago] = useState("efectivo");
   const [contratos, setContratos] = useState<any[]>([]);
   const [contratoId, setContratoId] = useState("");
 
@@ -22,12 +26,22 @@ function RegistrarDevolucionModal({ open, onClose, onSuccess }: Props) {
   useEffect(() => {
     const load = async () => {
       const res = await getContratos();
-      const activos = res.filter((c: any) => c.estado === "activo");
-      setContratos(activos.length ? activos : res);
+
+      const contratosPendientes = res.filter((c: any) => {
+        return c.estado === "activo" || Number(c.saldo_pendiente || 0) > 0;
+      });
+
+      setContratos(contratosPendientes.length ? contratosPendientes : res);
+
+      if (contratoIdProp) {
+        setContratoId(contratoIdProp);
+      }
     };
 
-    if (open) load();
-  }, [open]);
+    if (open) {
+      load();
+    }
+  }, [open, contratoIdProp]);
 
   const handleSubmit = async () => {
     if (!contratoId) {
@@ -41,22 +55,21 @@ function RegistrarDevolucionModal({ open, onClose, onSuccess }: Props) {
       const res = await registrarDevolucion({
         contrato_id: contratoId,
         fecha_devolucion: fechaHoy,
-        metodo_pago: metodoPago,
       });
 
       Swal.fire({
         icon: "success",
         title: "Devolución registrada",
         html: `
-          Retraso: ${res.dias_retraso} días <br/>
-          Penalidad: $${res.penalidad_total}
+          <b>Retraso:</b> ${res.dias_retraso || 0} días <br/>
+          <b>Penalidad:</b> $${res.penalidad_total || 0} <br/><br/>
+          ${
+            Number(res.penalidad_total || 0) > 0
+              ? "La penalidad queda como saldo pendiente. Debe cobrarse desde pagos del contrato."
+              : "No se generó penalidad."
+          }
         `,
       });
-
-      // 🔥 ABRIR NOTA AUTOMÁTICAMENTE
-      if (res.nota_id) {
-        window.open(`/api/notas/${res.nota_id}/pdf`, "_blank");
-      }
 
       onSuccess();
       onClose();
@@ -68,6 +81,8 @@ function RegistrarDevolucionModal({ open, onClose, onSuccess }: Props) {
           error.response?.data?.message ?? "No se pudo registrar",
           "error",
         );
+      } else {
+        Swal.fire("Error", "No se pudo registrar", "error");
       }
     } finally {
       setLoading(false);
@@ -76,12 +91,19 @@ function RegistrarDevolucionModal({ open, onClose, onSuccess }: Props) {
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-[var(--radius-lg)] w-[420px] shadow-[var(--shadow-medium)]">
-        <h2 className="font-semibold mb-4">Registrar devolución</h2>
+  const selected = contratos.find((c) => c.id === contratoId);
 
-        <label>Contrato</label>
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-[var(--radius-lg)] w-[460px] shadow-[var(--shadow-medium)]">
+        <h2 className="text-xl font-semibold mb-1">Registrar devolución</h2>
+
+        <p className="text-sm text-gray-500 mb-4">
+          Esta acción devuelve el stock, finaliza el contrato y calcula
+          penalidad si existe.
+        </p>
+
+        <label className="text-sm font-medium">Contrato</label>
         <select
           value={contratoId}
           onChange={(e) => setContratoId(e.target.value)}
@@ -90,38 +112,61 @@ function RegistrarDevolucionModal({ open, onClose, onSuccess }: Props) {
           <option value="">Seleccione</option>
           {contratos.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.numero_contrato ?? c.id}
+              {c.numero_contrato ?? c.id} - {c.cliente ?? "Cliente"}
             </option>
           ))}
         </select>
 
-        <label>Fecha</label>
+        {selected && (
+          <div className="bg-gray-50 border rounded-lg p-3 mb-3 text-sm">
+            <p>
+              <b>Total:</b> ${Number(selected.total || 0).toFixed(2)}
+            </p>
+            <p>
+              <b>Pagado:</b> ${Number(selected.pagado || 0).toFixed(2)}
+            </p>
+            <p>
+              <b>Saldo pendiente:</b> $
+              {Number(selected.saldo_pendiente || 0).toFixed(2)}
+            </p>
+            <p>
+              <b>Estado:</b> {selected.estado}
+            </p>
+          </div>
+        )}
+
+        <label className="text-sm font-medium">Fecha devolución</label>
         <input
           type="date"
           value={fechaHoy}
           disabled
-          className="w-full border p-2 rounded bg-gray-100 mb-3"
+          className="w-full border p-2 rounded bg-gray-100 mb-4"
         />
 
-        <label>Método de pago</label>
-        <select
-          value={metodoPago}
-          onChange={(e) => setMetodoPago(e.target.value)}
-          className="w-full border p-2 rounded mb-4"
-        >
-          <option value="efectivo">Efectivo</option>
-          <option value="transferencia">Transferencia</option>
-          <option value="tarjeta">Tarjeta</option>
-        </select>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <p className="text-sm text-yellow-800 font-medium">Importante</p>
+          <p className="text-xs text-yellow-700 mt-1">
+            La devolución no registra dinero ni genera nota de venta. Si existe
+            penalidad, se cobrará luego desde pagos del contrato con concepto
+            “penalidad”.
+          </p>
+        </div>
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose}>Cancelar</button>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 rounded border"
+          >
+            Cancelar
+          </button>
 
           <button
             onClick={handleSubmit}
+            disabled={loading}
             className="bg-[var(--color-primary)] text-white px-4 py-2 rounded"
           >
-            {loading ? "Procesando..." : "Confirmar"}
+            {loading ? "Procesando..." : "Confirmar devolución"}
           </button>
         </div>
       </div>

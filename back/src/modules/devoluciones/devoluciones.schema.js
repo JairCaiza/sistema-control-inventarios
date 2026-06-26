@@ -5,9 +5,6 @@ const registrarDevolucionSchema = Joi.object({
 
     fecha_devolucion: Joi.date().required(),
 
-    metodo_pago: Joi.string() // 🔥 AGREGAR
-        .valid("efectivo", "transferencia", "tarjeta")
-        .required()
 });
 
 module.exports = {

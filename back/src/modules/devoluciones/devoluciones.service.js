@@ -1,15 +1,17 @@
 const { pool } = require("../../config/db");
-const notasService = require("../ventas/notas/notas.service");
 
+/* =========================
+   REGISTRAR DEVOLUCIÓN
+========================= */
 const registrar = async (data) => {
     const client = await pool.connect();
 
     try {
         await client.query("BEGIN");
 
-        /* 1️⃣ Obtener contrato */
+        /* 1. Obtener contrato */
         const contratoRes = await client.query(
-            `SELECT id, fecha_fin
+            `SELECT id, fecha_fin, estado
              FROM contratos_alquiler
              WHERE id = $1`,
             [data.contrato_id]
@@ -21,7 +23,25 @@ const registrar = async (data) => {
 
         const contrato = contratoRes.rows[0];
 
-        /* 2️⃣ Calcular días de retraso */
+        /* 2. Validar que no esté finalizado */
+        if (contrato.estado === "finalizado") {
+            throw new Error("No se puede registrar devolución de un contrato finalizado");
+        }
+
+        /* 3. Validar que no tenga devolución previa */
+        const devolucionExiste = await client.query(
+            `SELECT id
+             FROM devoluciones
+             WHERE contrato_id = $1
+             LIMIT 1`,
+            [data.contrato_id]
+        );
+
+        if (devolucionExiste.rows.length > 0) {
+            throw new Error("Este contrato ya tiene una devolución registrada");
+        }
+
+        /* 4. Calcular días de retraso */
         const fechaFin = new Date(contrato.fecha_fin);
         const fechaDev = new Date(data.fecha_devolucion);
 
@@ -32,7 +52,7 @@ const registrar = async (data) => {
             dias_retraso = Math.ceil(diff / (1000 * 60 * 60 * 24));
         }
 
-        /* 3️⃣ Obtener activos del contrato */
+        /* 5. Obtener activos del contrato */
         const activosRes = await client.query(
             `SELECT activo_id, cantidad, precio_diario
              FROM detalles_contrato
@@ -40,17 +60,23 @@ const registrar = async (data) => {
             [data.contrato_id]
         );
 
-        /* 4️⃣ Calcular penalidad */
+        if (activosRes.rows.length === 0) {
+            throw new Error("El contrato no tiene activos asociados");
+        }
+
+        /* 6. Calcular penalidad */
         let penalidad_total = 0;
 
         if (dias_retraso > 0) {
             activosRes.rows.forEach((a) => {
                 penalidad_total +=
-                    dias_retraso * a.precio_diario * a.cantidad;
+                    dias_retraso *
+                    Number(a.precio_diario) *
+                    Number(a.cantidad);
             });
         }
 
-        /* 5️⃣ Insertar devolución */
+        /* 7. Insertar devolución */
         const insertRes = await client.query(
             `INSERT INTO devoluciones
              (contrato_id, fecha_devolucion, dias_retraso, penalidad_total)
@@ -66,83 +92,52 @@ const registrar = async (data) => {
 
         const devolucion = insertRes.rows[0];
 
-        /* 6️⃣ Actualizar estado contrato */
+        /* 8. Finalizar contrato y sumar penalidad al saldo pendiente */
         await client.query(
             `UPDATE contratos_alquiler
-             SET estado = 'finalizado'
+             SET estado = 'finalizado',
+                 saldo_pendiente = saldo_pendiente + $2
              WHERE id = $1`,
-            [data.contrato_id]
+            [
+                data.contrato_id,
+                penalidad_total
+            ]
         );
 
-        /* 🔥 7️⃣ DEVOLVER STOCK */
+        /* 9. Devolver stock */
         for (const a of activosRes.rows) {
             await client.query(
                 `UPDATE activos
                  SET cantidad_total = cantidad_total + $1,
                      estado = 'disponible'
                  WHERE id = $2`,
-                [a.cantidad, a.activo_id]
+                [
+                    a.cantidad,
+                    a.activo_id
+                ]
             );
 
             await client.query(
                 `INSERT INTO movimientos_inventario
-                 (activo_id, tipo_movimiento, cantidad, motivo)
-                 VALUES ($1, 'entrada', $2, 'Devolución contrato')`,
-                [a.activo_id, a.cantidad]
+                 (activo_id, tipo_movimiento, cantidad, motivo, referencia)
+                 VALUES ($1, 'entrada', $2, $3, $4)`,
+                [
+                    a.activo_id,
+                    a.cantidad,
+                    "Devolución de contrato",
+                    `Contrato ${data.contrato_id}`
+                ]
             );
         }
 
-        /* 🔥 8️⃣ CREAR NOTA DE VENTA */
-        const totalContratoRes = await client.query(
-            `SELECT total, cliente_id
-             FROM contratos_alquiler
-             WHERE id = $1`,
-            [data.contrato_id]
-        );
-
-        const contratoData = totalContratoRes.rows[0];
-
-        const totalContrato = Number(contratoData.total);
-
-        const detalles = [
-            {
-                descripcion: "Alquiler de equipos",
-                cantidad: 1,
-                precio_unitario: totalContrato
-            }
-        ];
-
-        if (penalidad_total > 0) {
-            detalles.push({
-                descripcion: "Penalidad por retraso",
-                cantidad: 1,
-                precio_unitario: penalidad_total
-            });
-        }
-
-        const nota = await notasService.crear(
-            {
-                cliente_id: contratoData.cliente_id,
-                metodo_pago: data.metodo_pago,
-                detalles
-            },
-            client
-        );
-
-        /* 🔥 9️⃣ GUARDAR RELACIÓN DEVOLUCIÓN - NOTA */
-        await client.query(
-            `UPDATE devoluciones
-             SET nota_id = $1
-             WHERE id = $2`,
-            [nota.id, devolucion.id]
-        );
-
         await client.query("COMMIT");
 
-        /* 🔥 10️⃣ RETORNAR TODO */
         return {
             ...devolucion,
-            nota_id: nota.id
+            mensaje:
+                penalidad_total > 0
+                    ? "Devolución registrada con penalidad pendiente de cobro"
+                    : "Devolución registrada sin penalidad"
         };
 
     } catch (error) {
@@ -153,9 +148,18 @@ const registrar = async (data) => {
     }
 };
 
+/* =========================
+   LISTAR DEVOLUCIONES
+========================= */
 const listar = async () => {
     const res = await pool.query(`
-        SELECT d.*, c.numero_contrato, cl.nombre AS cliente
+        SELECT
+            d.*,
+            c.numero_contrato,
+            c.total,
+            c.pagado,
+            c.saldo_pendiente,
+            cl.nombre AS cliente
         FROM devoluciones d
         JOIN contratos_alquiler c ON c.id = d.contrato_id
         JOIN clientes cl ON cl.id = c.cliente_id
@@ -165,9 +169,18 @@ const listar = async () => {
     return res.rows;
 };
 
+/* =========================
+   OBTENER DEVOLUCIÓN POR ID
+========================= */
 const obtenerPorId = async (id) => {
     const res = await pool.query(`
-        SELECT d.*, c.numero_contrato, cl.nombre AS cliente
+        SELECT
+            d.*,
+            c.numero_contrato,
+            c.total,
+            c.pagado,
+            c.saldo_pendiente,
+            cl.nombre AS cliente
         FROM devoluciones d
         JOIN contratos_alquiler c ON c.id = d.contrato_id
         JOIN clientes cl ON cl.id = c.cliente_id
