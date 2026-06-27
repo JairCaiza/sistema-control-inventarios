@@ -21,34 +21,34 @@ pipeline {
 
         stage('Información del entorno') {
             steps {
-                sh 'node --version || true'
-                sh 'npm --version || true'
                 sh 'docker --version'
                 sh 'git --version'
+                sh 'docker run --rm node:22-alpine node --version'
+                sh 'docker run --rm node:22-alpine npm --version'
             }
         }
 
-        stage('Instalar dependencias Backend') {
+        stage('Validar Backend') {
             steps {
-                dir('back') {
-                    sh 'npm install'
-                }
+                sh '''
+                    docker run --rm \
+                    -v "$WORKSPACE/back:/app" \
+                    -w /app \
+                    node:22-alpine \
+                    sh -c "npm install && npm test"
+                '''
             }
         }
 
-        stage('Instalar dependencias Frontend') {
+        stage('Validar Frontend') {
             steps {
-                dir('frontend') {
-                    sh 'npm install'
-                }
-            }
-        }
-
-        stage('Compilar Frontend') {
-            steps {
-                dir('frontend') {
-                    sh 'npm run build'
-                }
+                sh '''
+                    docker run --rm \
+                    -v "$WORKSPACE/frontend:/app" \
+                    -w /app \
+                    node:22-alpine \
+                    sh -c "npm install && npm run build"
+                '''
             }
         }
 
