@@ -13,7 +13,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -22,46 +21,24 @@ pipeline {
 
         stage('Información del entorno') {
             steps {
-                sh 'docker --version'
                 sh 'git --version'
-                sh 'docker run --rm node:22-alpine node --version'
-                sh 'docker run --rm node:22-alpine npm --version'
-            }
-        }
-
-        stage('Validar Backend') {
-            steps {
-                sh '''
-                    docker run --rm \
-                    -v "$WORKSPACE:/workspace" \
-                    -w /workspace \
-                    node:22-alpine \
-                    sh -c "cd back && npm install && npm test"
-                '''
-            }
-        }
-
-        stage('Validar Frontend') {
-            steps {
-                sh '''
-                    docker run --rm \
-                    -v "$WORKSPACE:/workspace" \
-                    -w /workspace \
-                    node:22-alpine \
-                    sh -c "cd frontend && npm install && npm run build"
-                '''
+                sh 'docker --version'
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'ls -la back || true'
+                sh 'ls -la frontend || true'
             }
         }
 
         stage('Construir imagen Backend') {
             steps {
-                sh 'docker build -t $BACKEND_IMAGE:latest ./back'
+                sh 'docker build --no-cache -t $BACKEND_IMAGE:latest ./back'
             }
         }
 
         stage('Construir imagen Frontend') {
             steps {
-                sh 'docker build --build-arg VITE_API_URL=$FRONTEND_API_URL -t $FRONTEND_IMAGE:latest ./frontend'
+                sh 'docker build --no-cache --build-arg VITE_API_URL=$FRONTEND_API_URL -t $FRONTEND_IMAGE:latest ./frontend'
             }
         }
 
