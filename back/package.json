@@ -1,16 +1,16 @@
 {
-  "name": "back",
+  "name": "gestion-procesos-productivos-backend",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "seed": "node seed.js"
+    "seed": "node src/config/seedAdmin.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Jairo Patricio Caiza Cunduri",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -14,3 +14,11 @@ export const registrarDevolucion = async (data: {
   const res = await api.post("/devoluciones", data);
   return res.data.data;
 };
+
+export const descargarNotaPDF = async (id: string) => {
+  const res = await api.get(`/notas/${id}/pdf`, {
+    responseType: "blob",
+  });
+
+  return res.data;
+};

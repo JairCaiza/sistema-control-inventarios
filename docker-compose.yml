@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: sistema-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: guaracadaqui_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Keyla2022
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+
+  backend:
+    build:
+      context: ./back
+
+    container_name: sistema-backend
+
+    restart: unless-stopped
+
+    depends_on:
+      - postgres
+
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: guaracadaqui_db
+      DB_USER: postgres
+      DB_PASSWORD: Keyla2022
+      DB_SSL: "false"
+      JWT_SECRET: super_secret_key_123
+      JWT_EXPIRES_IN: 8h
+
+    ports:
+      - "3001:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:3001/api
+
+    container_name: sistema-frontend
+
+    restart: unless-stopped
+
+    depends_on:
+      - backend
+
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
