@@ -4,6 +4,7 @@ pipeline {
     options {
         timestamps()
         disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     environment {
@@ -13,45 +14,70 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Información del entorno') {
+        stage('Verificar entorno') {
             steps {
-                sh 'git --version'
-                sh 'docker --version'
-                sh 'pwd'
-                sh 'ls -la'
-                sh 'ls -la back || true'
-                sh 'ls -la frontend || true'
+                sh '''
+                    echo "=== Información del entorno CI ==="
+                    git --version
+                    docker --version
+                    pwd
+                    ls -la
+                    ls -la back
+                    ls -la frontend
+                '''
+            }
+        }
+
+        stage('Pruebas Backend') {
+            steps {
+                sh '''
+                    echo "=== Ejecutando pruebas automatizadas del backend ==="
+                    docker build -t backend-test-runner ./back
+                    docker run --rm backend-test-runner npm test
+                '''
             }
         }
 
         stage('Construir imagen Backend') {
             steps {
-                sh 'docker build --no-cache -t $BACKEND_IMAGE:latest ./back'
+                sh '''
+                    echo "=== Construyendo imagen Docker del backend ==="
+                    docker build --no-cache -t $BACKEND_IMAGE:latest ./back
+                '''
             }
         }
 
         stage('Construir imagen Frontend') {
             steps {
-                sh 'docker build --no-cache --build-arg VITE_API_URL=$FRONTEND_API_URL -t $FRONTEND_IMAGE:latest ./frontend'
+                sh '''
+                    echo "=== Construyendo imagen Docker del frontend ==="
+                    docker build --no-cache \
+                      --build-arg VITE_API_URL=$FRONTEND_API_URL \
+                      -t $FRONTEND_IMAGE:latest ./frontend
+                '''
             }
         }
 
         stage('Verificar imágenes') {
             steps {
-                sh 'docker images | grep sistemacontrolinventarios'
+                sh '''
+                    echo "=== Imágenes generadas por el pipeline CI ==="
+                    docker images | grep sistemacontrolinventarios
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline CI ejecutado correctamente.'
+            echo 'Pipeline CI ejecutado correctamente: construcción, pruebas y validación completadas.'
         }
 
         failure {
@@ -59,7 +85,7 @@ pipeline {
         }
 
         always {
-            echo 'Finalizó la ejecución del pipeline.'
+            echo 'Finalizó la ejecución del pipeline de Integración Continua.'
         }
     }
 }

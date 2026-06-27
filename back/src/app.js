@@ -51,7 +51,12 @@ app.use(
 /* =========================
    RUTAS TEST
 ========================= */
-
+app.get("/health", (req, res) => {
+   res.status(200).json({
+      status: "ok",
+      service: "backend",
+   });
+});
 app.get("/api/test", protect, (req, res) => {
    res.json({
       message: "Acceso permitido",
