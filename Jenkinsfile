@@ -13,6 +13,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -32,10 +33,10 @@ pipeline {
             steps {
                 sh '''
                     docker run --rm \
-                    -v "$WORKSPACE/back:/app" \
-                    -w /app \
+                    -v "$WORKSPACE:/workspace" \
+                    -w /workspace \
                     node:22-alpine \
-                    sh -c "npm install && npm test"
+                    sh -c "cd back && npm install && npm test"
                 '''
             }
         }
@@ -44,10 +45,10 @@ pipeline {
             steps {
                 sh '''
                     docker run --rm \
-                    -v "$WORKSPACE/frontend:/app" \
-                    -w /app \
+                    -v "$WORKSPACE:/workspace" \
+                    -w /workspace \
                     node:22-alpine \
-                    sh -c "npm install && npm run build"
+                    sh -c "cd frontend && npm install && npm run build"
                 '''
             }
         }
