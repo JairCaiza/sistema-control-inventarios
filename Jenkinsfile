@@ -27,7 +27,7 @@ pipeline {
                     echo "=== Información del entorno CI/CD ==="
                     git --version
                     docker --version
-                    docker-compose --version || true
+                    docker compose version || true
                     pwd
                     ls -la
                     ls -la back
@@ -79,9 +79,9 @@ pipeline {
             steps {
                 sh '''
                     echo "=== Desplegando aplicación con Docker Compose ==="
-                    docker-compose down || true
-                    docker-compose up -d --build
-                    docker-compose ps
+                    docker compose down || true
+                    docker compose up -d --build
+                    docker compose ps
                 '''
             }
         }
