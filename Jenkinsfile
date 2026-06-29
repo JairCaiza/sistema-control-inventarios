@@ -24,9 +24,10 @@ pipeline {
         stage('Verificar entorno') {
             steps {
                 sh '''
-                    echo "=== Información del entorno CI ==="
+                    echo "=== Información del entorno CI/CD ==="
                     git --version
                     docker --version
+                    docker-compose --version || true
                     pwd
                     ls -la
                     ls -la back
@@ -68,8 +69,19 @@ pipeline {
         stage('Verificar imágenes') {
             steps {
                 sh '''
-                    echo "=== Imágenes generadas por el pipeline CI ==="
+                    echo "=== Imágenes generadas por el pipeline CI/CD ==="
                     docker images | grep sistemacontrolinventarios
+                '''
+            }
+        }
+
+        stage('Despliegue con Docker Compose') {
+            steps {
+                sh '''
+                    echo "=== Desplegando aplicación con Docker Compose ==="
+                    docker-compose down || true
+                    docker-compose up -d --build
+                    docker-compose ps
                 '''
             }
         }
@@ -77,15 +89,15 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline CI ejecutado correctamente: construcción, pruebas y validación completadas.'
+            echo 'Pipeline CI/CD ejecutado correctamente: construcción, pruebas, validación y despliegue completados.'
         }
 
         failure {
-            echo 'Pipeline CI falló. Revisar la consola de Jenkins.'
+            echo 'Pipeline CI/CD falló. Revisar la consola de Jenkins.'
         }
 
         always {
-            echo 'Finalizó la ejecución del pipeline de Integración Continua.'
+            echo 'Finalizó la ejecución del pipeline de Integración y Despliegue Continuo.'
         }
     }
 }
