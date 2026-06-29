@@ -79,8 +79,17 @@ pipeline {
             steps {
                 sh '''
                     echo "=== Desplegando aplicación con Docker Compose ==="
+
+                    echo "=== Deteniendo servicios existentes ==="
                     docker compose down || true
+
+                    echo "=== Eliminando contenedores anteriores si existen ==="
+                    docker rm -f sistema-postgres sistema-backend sistema-frontend || true
+
+                    echo "=== Construyendo y levantando servicios ==="
                     docker compose up -d --build
+
+                    echo "=== Estado de los servicios desplegados ==="
                     docker compose ps
                 '''
             }
