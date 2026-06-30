@@ -12,7 +12,7 @@ pipeline {
         BACKEND_IMAGE = 'jairo1995/sistema-control-backend'
         FRONTEND_IMAGE = 'jairo1995/sistema-control-frontend'
         FRONTEND_API_URL = 'http://3.235.13.32:30081/api'
-        K8S_MASTER_IP = '3.235.13.32'
+        K8S_MASTER_IP = '13.222.26.199'
         K8S_NAMESPACE = 'sistema-control'
     }
 
