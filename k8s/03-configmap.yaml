@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sistema-control-config
+  namespace: sistema-control
+data:
+  APP_NAME: "Sistema Control de Inventarios"
+  APP_ENV: "production"
+
+  PORT: "3000"
+
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_SSL: "false"
+
+  VITE_API_URL: "http://backend-service:3000/api"
+
+  TZ: "America/Guayaquil"
