@@ -8,9 +8,12 @@ pipeline {
     }
 
     environment {
-        BACKEND_IMAGE = 'sistemacontrolinventarios-backend-ci'
-        FRONTEND_IMAGE = 'sistemacontrolinventarios-frontend-ci'
-        FRONTEND_API_URL = 'http://localhost:3001/api'
+        DOCKERHUB_USER = 'jairo1995'
+        BACKEND_IMAGE = 'jairo1995/sistema-control-backend'
+        FRONTEND_IMAGE = 'jairo1995/sistema-control-frontend'
+        FRONTEND_API_URL = 'http://3.235.13.32:30081/api'
+        K8S_MASTER_IP = '3.235.13.32'
+        K8S_NAMESPACE = 'sistema-control'
     }
 
     stages {
@@ -27,11 +30,11 @@ pipeline {
                     echo "=== Información del entorno CI/CD ==="
                     git --version
                     docker --version
-                    docker compose version || true
                     pwd
                     ls -la
                     ls -la back
                     ls -la frontend
+                    ls -la k8s
                 '''
             }
         }
@@ -66,39 +69,53 @@ pipeline {
             }
         }
 
-        stage('Verificar imágenes') {
+        stage('Login Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Publicar imágenes en Docker Hub') {
             steps {
                 sh '''
-                    echo "=== Imágenes generadas por el pipeline CI/CD ==="
-                    docker images | grep sistemacontrolinventarios
+                    echo "=== Subiendo imágenes a Docker Hub ==="
+                    docker push $BACKEND_IMAGE:latest
+                    docker push $FRONTEND_IMAGE:latest
                 '''
             }
         }
 
-        stage('Despliegue con Docker Compose') {
+        stage('Desplegar en Kubernetes') {
             steps {
-                sh '''
-                    echo "=== Desplegando aplicación con Docker Compose ==="
+                sshagent(credentials: ['k8s-master-ssh']) {
+                    sh '''
+                        echo "=== Desplegando en Kubernetes mediante SSH ==="
 
-                    echo "=== Deteniendo servicios existentes ==="
-                    docker compose down || true
-
-                    echo "=== Eliminando contenedores anteriores si existen ==="
-                    docker rm -f sistema-postgres sistema-backend sistema-frontend || true
-
-                    echo "=== Construyendo y levantando servicios ==="
-                    docker compose up -d --build
-
-                    echo "=== Estado de los servicios desplegados ==="
-                    docker compose ps
-                '''
+                        ssh -o StrictHostKeyChecking=no ec2-user@$K8S_MASTER_IP "
+                            kubectl rollout restart deployment backend-deployment -n $K8S_NAMESPACE &&
+                            kubectl rollout restart deployment frontend-deployment -n $K8S_NAMESPACE &&
+                            kubectl rollout status deployment backend-deployment -n $K8S_NAMESPACE &&
+                            kubectl rollout status deployment frontend-deployment -n $K8S_NAMESPACE &&
+                            kubectl get pods -n $K8S_NAMESPACE &&
+                            kubectl get svc -n $K8S_NAMESPACE
+                        "
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline CI/CD ejecutado correctamente: construcción, pruebas, validación y despliegue completados.'
+            echo 'Pipeline CI/CD ejecutado correctamente: build, test, push y despliegue en Kubernetes completados.'
         }
 
         failure {
@@ -106,7 +123,7 @@ pipeline {
         }
 
         always {
-            echo 'Finalizó la ejecución del pipeline de Integración y Despliegue Continuo.'
+            echo 'Finalizó la ejecución del pipeline CI/CD hacia Kubernetes.'
         }
     }
 }
