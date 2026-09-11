@@ -28,7 +28,24 @@ const notasRoutes = require("./modules/ventas/notas/notas.routes");
 const empleadosRoutes = require("./modules/gestion_obras/empleados/empleados.routes");
 const obrasRoutes = require("./modules/gestion_obras/obras/obras.routes");
 const pagosContratosRoutes = require("./modules/contratos/pagos/pagosContratos.routes");
+const cuentasFinancierasRoutes = require("./modules/cuentas-financieras/cuentasFinancieras.routes");
+const transaccionesRoutes = require("./modules/transacciones/transacciones.routes");
+const socioRoutes = require("./modules/soscios/socio.routes");
+const aporteSocioRoutes =
+   require("./modules/soscios/aporteSocios/aporteSocio.routes");
 
+
+const utilidadSocioRoutes =
+   require("./modules/soscios/utilidadesSocios/utilidadSocio.routes");
+const pagoEmpleadoRoutes =
+   require(
+      "./modules/personal/pagosEmpleados/pagoEmpleado.routes"
+   );
+const gastoObraRoutes =
+   require("./modules/gestion_obras/gastosObra/gastoObra.routes");
+const reporteObraRoutes =
+   require("./modules/gestion_obras/reportesObra/reporteObra.routes");
+const asistenciaRoutes = require("./modules/gestion_obras/asistencia/asistencia.routes");
 const app = express();
 
 /* =========================
@@ -137,8 +154,39 @@ app.use("/api/obras", obrasRoutes);
 ========================= */
 
 app.use("/api/contratos", pagosContratosRoutes);
-
-
+/* =========================
+   Cuentas Financieras
+========================= */
+app.use(
+   "/api/cuentas-financieras",
+   cuentasFinancierasRoutes
+);
+app.use(
+   "/api/transacciones",
+   transaccionesRoutes
+);
+app.use("/api/socios", socioRoutes);
+app.use(
+   "/api/aportes-socios",
+   aporteSocioRoutes
+);
+app.use(
+   "/api/utilidades-socios",
+   utilidadSocioRoutes
+);
+app.use(
+   "/api/pagos-empleados",
+   pagoEmpleadoRoutes
+);
+app.use(
+   "/api/gastos-obra",
+   gastoObraRoutes
+);
+app.use(
+   "/api/reportes-obras",
+   reporteObraRoutes
+);
+app.use("/api/asistencias", asistenciaRoutes);
 /* =========================
    ERROR HANDLER
 ========================= */

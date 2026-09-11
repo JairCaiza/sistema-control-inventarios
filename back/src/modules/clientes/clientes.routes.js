@@ -12,9 +12,13 @@ const {
 } = require("./clientes.controller");
 
 router.post("/", protect, crear);
+
 router.get("/", protect, listar);
+
 router.get("/:id", protect, obtener);
+
 router.put("/:id", protect, actualizar);
+
 router.delete("/:id", protect, eliminar);
 
 module.exports = router;

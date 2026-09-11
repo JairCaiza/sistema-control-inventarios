@@ -1,73 +1,173 @@
-const express = require("express");
+const express =
+   require("express");
 
-const router = express.Router();
+const router =
+   express.Router();
 
-const obrasController = require("./obras.controller");
+const obrasController =
+   require("./obras.controller");
 
-const protect = require("../../../middlewares/auth.middleware");
+const protect =
+   require("../../../middlewares/auth.middleware");
 
-const authorizeRoles = require("../../../middlewares/role.middleware");
+const authorizeRoles =
+   require("../../../middlewares/role.middleware");
 
-/* =========================
-   MIDDLEWARES
-========================= */
-router.use(protect);
+/* =====================================================
+   PROTEGER TODAS LAS RUTAS
+===================================================== */
 
-router.use(authorizeRoles("Administrador"));
+router.use(
+   protect
+);
 
-/* =========================
-   RUTAS
-========================= */
+/* =====================================================
+   PERMISOS DEL MÓDULO
+===================================================== */
 
-// crear obra
-router.post("/", obrasController.createObra);
+router.use(
+   authorizeRoles(
+      "Administrador"
+   )
+);
 
-// listar obras
-router.get("/", obrasController.getObras);
-// obtener una obra
-router.get("/:id", obrasController.getObraById);
-// actualizar obra
-router.put("/:id", obrasController.updateObra);
-
-// eliminar obra
-router.delete("/:id", obrasController.deleteObra);
-
-
-/* =========================
+/* =====================================================
    ASIGNAR EMPLEADO
-========================= */
+   IMPORTANTE:
+   RUTAS ESPECÍFICAS ANTES DE /:id
+===================================================== */
+
 router.post(
    "/asignar-empleado",
-   obrasController.asignarEmpleadoObra
+   obrasController
+      .asignarEmpleadoObra
 );
 
-/* =========================
+/* =====================================================
    EMPLEADOS DE UNA OBRA
-========================= */
+===================================================== */
+
 router.get(
    "/ver_empleados/:obraId",
-   obrasController.getEmpleadosObra
+   obrasController
+      .getEmpleadosObra
 );
 
-/* =========================
-   DESASIGNAR EMPLEADO
-========================= */
-router.patch(
-   "/:id/desasignar",
-   obrasController.desasignarEmpleadoObra
-);
+/* =====================================================
+   CONTROLES DIARIOS
+===================================================== */
 
-/* =========================
-   rutas para registrar actividades diarias de la obra
-========================= */
-
+/*
+ * Registrar un nuevo control diario.
+ *
+ * POST
+ * /api/obras/controles-diarios
+ */
 router.post(
    "/controles-diarios",
-   obrasController.registrarActividadObra
-);
-router.get(
-   "/controles-diarios/:obra_id",
-   obrasController.listarControlesPorObra
+   obrasController
+      .registrarActividadObra
 );
 
-module.exports = router;
+/*
+ * Listar TODOS los controles diarios
+ * de TODAS las obras.
+ *
+ * Esta ruta será utilizada por:
+ * Gestión Obras -> Control Diario
+ *
+ * GET
+ * /api/obras/controles-diarios
+ */
+router.get(
+   "/controles-diarios",
+   obrasController
+      .listarTodosControles
+);
+
+/*
+ * Listar controles diarios
+ * de UNA obra específica.
+ *
+ * Esta ruta será utilizada por:
+ * Gestión Obras -> Obras -> Ver obra
+ *
+ * GET
+ * /api/obras/controles-diarios/:obra_id
+ */
+router.get(
+   "/controles-diarios/:obra_id",
+   obrasController
+      .listarControlesPorObra
+);
+
+/* =====================================================
+   DESASIGNAR EMPLEADO
+===================================================== */
+
+router.patch(
+   "/:id/desasignar",
+   obrasController
+      .desasignarEmpleadoObra
+);
+
+/* =====================================================
+   CRUD OBRAS
+===================================================== */
+
+/* =====================================================
+   CREAR OBRA
+===================================================== */
+
+router.post(
+   "/",
+   obrasController
+      .createObra
+);
+
+/* =====================================================
+   LISTAR OBRAS
+===================================================== */
+
+router.get(
+   "/",
+   obrasController
+      .getObras
+);
+
+/* =====================================================
+   OBTENER OBRA POR ID
+===================================================== */
+
+router.get(
+   "/:id",
+   obrasController
+      .getObraById
+);
+
+/* =====================================================
+   ACTUALIZAR OBRA
+===================================================== */
+
+router.put(
+   "/:id",
+   obrasController
+      .updateObra
+);
+
+/* =====================================================
+   ELIMINAR OBRA
+===================================================== */
+
+router.delete(
+   "/:id",
+   obrasController
+      .deleteObra
+);
+
+/* =====================================================
+   EXPORT
+===================================================== */
+
+module.exports =
+   router;

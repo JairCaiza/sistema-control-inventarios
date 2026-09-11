@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   LayoutDashboard,
@@ -14,6 +14,7 @@ import {
   Hammer,
   HardHat,
   ClipboardList,
+  ClipboardCheck,
   Wallet,
   Landmark,
   HandCoins,
@@ -23,64 +24,367 @@ import {
   DollarSign,
   CalendarDays,
   Lock,
+  UserCircle,
+  PiggyBank,
 } from "lucide-react";
 
 import logo from "../assets/logoguaraca.png";
 
+/* =====================================================
+   TIPOS
+===================================================== */
+
+type RolLocal =
+  | string
+  | {
+      nombre?: string;
+      name?: string;
+      rol?: string;
+      role?: string;
+    };
+
+interface UsuarioLocal {
+  id?: string;
+  nombre?: string;
+  apellido?: string;
+  correo?: string;
+
+  roles?: RolLocal[];
+
+  rol?: RolLocal;
+
+  role?: RolLocal;
+}
+
+interface UsuarioAlmacenado {
+  usuario?: UsuarioLocal;
+
+  user?: UsuarioLocal;
+
+  id?: string;
+  nombre?: string;
+  apellido?: string;
+  correo?: string;
+
+  roles?: RolLocal[];
+
+  rol?: RolLocal;
+
+  role?: RolLocal;
+}
+
+/* =====================================================
+   HELPERS DE AUTENTICACIÓN
+===================================================== */
+
+const leerUsuarioLocalStorage = (): UsuarioLocal | null => {
+  try {
+    const usuarioGuardado = localStorage.getItem("usuario");
+
+    if (!usuarioGuardado) {
+      return null;
+    }
+
+    const parsed: UsuarioAlmacenado = JSON.parse(usuarioGuardado);
+
+    return parsed.usuario ?? parsed.user ?? parsed;
+  } catch (error) {
+    console.error("Error al leer usuario desde localStorage:", error);
+
+    return null;
+  }
+};
+
+/* =====================================================
+   HELPERS DE ROLES
+===================================================== */
+
+const normalizarRol = (rol: RolLocal | null | undefined): string => {
+  if (!rol) {
+    return "";
+  }
+
+  if (typeof rol === "string") {
+    return rol.trim().toLowerCase();
+  }
+
+  const nombreRol = rol.nombre ?? rol.name ?? rol.rol ?? rol.role ?? "";
+
+  return String(nombreRol).trim().toLowerCase();
+};
+
+const obtenerRolesUsuario = (usuario: UsuarioLocal | null): string[] => {
+  if (!usuario) {
+    return [];
+  }
+
+  let rolesOriginales: RolLocal[] = [];
+
+  if (Array.isArray(usuario.roles)) {
+    rolesOriginales = usuario.roles;
+  } else if (usuario.rol) {
+    rolesOriginales = [usuario.rol];
+  } else if (usuario.role) {
+    rolesOriginales = [usuario.role];
+  }
+
+  return [...new Set(rolesOriginales.map(normalizarRol).filter(Boolean))];
+};
+
+/* =====================================================
+   SIDEBAR
+===================================================== */
+
 function Sidebar() {
   const location = useLocation();
 
-  const [collapsed, setCollapsed] = useState(false);
+  /* =====================================================
+     SIDEBAR COLAPSADO
+  ===================================================== */
 
-  /* =========================
-     MENÚS DESPLEGABLES
-  ========================= */
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("sidebarCollapsed");
+
+      if (saved === null) {
+        return false;
+      }
+
+      const parsed = JSON.parse(saved);
+
+      return typeof parsed === "boolean" ? parsed : false;
+    } catch (error) {
+      console.error("Error al recuperar estado del Sidebar:", error);
+
+      return false;
+    }
+  });
+
+  /* =====================================================
+     USUARIO AUTENTICADO
+  ===================================================== */
+
+  const [usuario, setUsuario] = useState<UsuarioLocal | null>(() =>
+    leerUsuarioLocalStorage(),
+  );
+
+  /* =====================================================
+     ESTADOS DE MENÚS MANUALES
+  ===================================================== */
+
   const [openAdmin, setOpenAdmin] = useState(false);
 
   const [openInventario, setOpenInventario] = useState(false);
 
   const [openObras, setOpenObras] = useState(false);
 
-  // NUEVOS
   const [openFinanzas, setOpenFinanzas] = useState(false);
 
   const [openPersonal, setOpenPersonal] = useState(false);
 
   const [openSocios, setOpenSocios] = useState(false);
 
-  /* =========================
-     GUARDAR ESTADO SIDEBAR
-  ========================= */
-  useEffect(() => {
-    const saved = localStorage.getItem("sidebarCollapsed");
+  const [openPortalSocio, setOpenPortalSocio] = useState(false);
 
-    if (saved) {
-      setCollapsed(JSON.parse(saved));
-    }
+  /* =====================================================
+     SINCRONIZAR USUARIO
+  ===================================================== */
+
+  useEffect(() => {
+    const actualizarUsuario = () => {
+      setUsuario(leerUsuarioLocalStorage());
+    };
+
+    const manejarStorage = (event: StorageEvent) => {
+      if (event.key === "usuario" || event.key === null) {
+        actualizarUsuario();
+      }
+    };
+
+    const manejarFocus = () => {
+      actualizarUsuario();
+    };
+
+    const manejarAuthChange = () => {
+      actualizarUsuario();
+    };
+
+    window.addEventListener("storage", manejarStorage);
+
+    window.addEventListener("focus", manejarFocus);
+
+    window.addEventListener("auth-change", manejarAuthChange);
+
+    return () => {
+      window.removeEventListener("storage", manejarStorage);
+
+      window.removeEventListener("focus", manejarFocus);
+
+      window.removeEventListener("auth-change", manejarAuthChange);
+    };
   }, []);
+
+  /* =====================================================
+     GUARDAR ESTADO DEL SIDEBAR
+  ===================================================== */
 
   useEffect(() => {
     localStorage.setItem("sidebarCollapsed", JSON.stringify(collapsed));
   }, [collapsed]);
 
-  const isActive = (path: string) => location.pathname === path;
+  /* =====================================================
+     ROLES
+  ===================================================== */
+
+  const roles = useMemo(() => obtenerRolesUsuario(usuario), [usuario]);
+
+  const esAdministrador = roles.includes("administrador");
+
+  const esContador = roles.includes("contador");
+
+  const esOperador = roles.includes("operador");
+
+  const esSocio = roles.includes("socio");
+
+  const puedeAdministrarSocios = esAdministrador || esContador;
+
+  /* =====================================================
+     DEBUG TEMPORAL
+  ===================================================== */
+
+  useEffect(() => {
+    console.log("SIDEBAR - USUARIO:", usuario);
+
+    console.log("SIDEBAR - ROLES:", roles);
+
+    console.log("SIDEBAR - ADMIN:", esAdministrador);
+
+    console.log("SIDEBAR - CONTADOR:", esContador);
+
+    console.log("SIDEBAR - OPERADOR:", esOperador);
+
+    console.log("SIDEBAR - SOCIO:", esSocio);
+  }, [usuario, roles, esAdministrador, esContador, esOperador, esSocio]);
+
+  /* =====================================================
+     HELPERS DE RUTAS
+  ===================================================== */
+
+  const isActive = (path: string): boolean => {
+    return location.pathname === path;
+  };
+
+  const isSectionActive = (path: string): boolean => {
+    return location.pathname.startsWith(path);
+  };
+
+  /* =====================================================
+     ESTADO DERIVADO DE MENÚS
+  ===================================================== */
+
+  const adminAbierto =
+    openAdmin ||
+    isSectionActive("/dashboard/usuarios") ||
+    isSectionActive("/dashboard/roles");
+
+  const inventarioAbierto =
+    openInventario ||
+    isSectionActive("/dashboard/categorias") ||
+    isSectionActive("/dashboard/ubicaciones") ||
+    isSectionActive("/dashboard/activos") ||
+    isSectionActive("/dashboard/movimientos") ||
+    isSectionActive("/dashboard/reportes/inventario");
+
+  const obrasAbierto =
+    openObras ||
+    isSectionActive("/dashboard/empleados") ||
+    isSectionActive("/dashboard/obras") ||
+    isSectionActive("/dashboard/control-diario") ||
+    isSectionActive("/dashboard/asistencia") ||
+    isSectionActive("/dashboard/gastos-obra") ||
+    isSectionActive("/dashboard/reporte-gastos-obra");
+
+  const finanzasAbierto =
+    openFinanzas ||
+    isSectionActive("/dashboard/dashboardfinanciero") ||
+    isSectionActive("/dashboard/cuentas") ||
+    isSectionActive("/dashboard/ingresos") ||
+    isSectionActive("/dashboard/egresos") ||
+    isSectionActive("/dashboard/transferencias") ||
+    isSectionActive("/dashboard/flujo-de-caja") ||
+    isSectionActive("/dashboard/utilidadmensual") ||
+    isSectionActive("/dashboard/cierres") ||
+    isSectionActive("/dashboard/periodos");
+
+  const personalAbierto =
+    openPersonal ||
+    isSectionActive("/dashboard/pagos-empleados") ||
+    isSectionActive("/dashboard/reportes-empleados");
+
+  const sociosAbierto = openSocios || isSectionActive("/dashboard/socios");
+
+  const portalSocioAbierto =
+    openPortalSocio || isSectionActive("/dashboard/mi-portal");
+
+  /* =====================================================
+     CLASES REUTILIZABLES
+  ===================================================== */
+
+  const claseItemPrincipal = (activo: boolean) => `
+    flex
+    items-center
+    gap-3
+    w-full
+    p-2
+    rounded
+    transition
+    ${activo ? "bg-[var(--color-primary)]" : "hover:bg-[var(--color-primary)]"}
+  `;
+
+  const claseSubItem = (activo: boolean) => `
+    flex
+    items-center
+    gap-2
+    p-2
+    rounded
+    transition
+    ${activo ? "bg-[var(--color-primary)]" : "hover:bg-[var(--color-primary)]"}
+  `;
+
+  const claseBotonSeccion = (activo = false) => `
+    flex
+    items-center
+    justify-between
+    w-full
+    p-2
+    rounded
+    transition
+    ${activo ? "bg-[var(--color-primary)]" : "hover:bg-[var(--color-primary)]"}
+  `;
+
+  /* =====================================================
+     RENDER
+  ===================================================== */
 
   return (
     <aside
-      className={`${collapsed ? "w-20" : "w-64"}
-      h-screen
-      overflow-y-auto
-      bg-[var(--color-bg-dark)]
-      text-white
-      flex
-      flex-col
-      transition-all
-      duration-300
-      shadow-lg`}
+      className={`
+        ${collapsed ? "w-20" : "w-64"}
+        h-screen
+        overflow-y-auto
+        bg-[var(--color-bg-dark)]
+        text-white
+        flex
+        flex-col
+        transition-all
+        duration-300
+        shadow-lg
+      `}
     >
-      {/* =========================
-         HEADER
-      ========================= */}
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
       <div
         className="
           flex
@@ -95,21 +399,44 @@ function Sidebar() {
           z-10
         "
       >
-        <div className="flex items-center gap-2">
-          <img src={logo} className="w-10 h-10 object-contain" />
+        <div
+          className="
+            flex
+            items-center
+            gap-2
+          "
+        >
+          <img
+            src={logo}
+            className="
+              w-10
+              h-10
+              object-contain
+            "
+            alt="ConstructSys"
+          />
 
           {!collapsed && (
-            <span className="font-bold text-lg">ConstructSys</span>
+            <span
+              className="
+                font-bold
+                text-lg
+              "
+            >
+              ConstructSys
+            </span>
           )}
         </div>
 
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          type="button"
+          onClick={() => setCollapsed((prev) => !prev)}
           className="
             text-gray-300
             hover:text-white
             transition
           "
+          aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
         >
           {collapsed ? (
             <PanelLeftOpen size={20} />
@@ -119,52 +446,48 @@ function Sidebar() {
         </button>
       </div>
 
-      {/* =========================
-         MENÚ
-      ========================= */}
-      <nav className="flex-1 p-3 space-y-2 text-sm">
-        {/* =========================
-           DASHBOARD
-        ========================= */}
+      {/* =================================================
+          MENÚ
+      ================================================= */}
+
+      <nav
+        className="
+          flex-1
+          p-3
+          space-y-2
+          text-sm
+        "
+      >
+        {/* =================================================
+            DASHBOARD
+        ================================================= */}
+
         <Link
           to="/dashboard"
           title="Dashboard"
-          className={`
-            flex
-            items-center
-            gap-3
-            p-2
-            rounded
-            transition
-            ${
-              isActive("/dashboard")
-                ? "bg-[var(--color-primary)]"
-                : "hover:bg-[var(--color-primary)]"
-            }
-          `}
+          className={claseItemPrincipal(isActive("/dashboard"))}
         >
           <LayoutDashboard size={18} />
 
           {!collapsed && "Dashboard"}
         </Link>
 
-        {/* =========================
-           ADMINISTRACIÓN
-        ========================= */}
+        {/* =================================================
+            ADMINISTRACIÓN
+        ================================================= */}
+
         <button
-          onClick={() => setOpenAdmin(!openAdmin)}
-          className="
-            flex
-            items-center
-            justify-between
-            w-full
-            p-2
-            rounded
-            hover:bg-[var(--color-primary)]
-            transition
-          "
+          type="button"
+          onClick={() => setOpenAdmin((prev) => !prev)}
+          className={claseBotonSeccion(adminAbierto)}
         >
-          <span className="flex items-center gap-3">
+          <span
+            className="
+              flex
+              items-center
+              gap-3
+            "
+          >
             <Shield size={18} />
 
             {!collapsed && "Administración"}
@@ -173,28 +496,24 @@ function Sidebar() {
           {!collapsed && (
             <ChevronDown
               size={16}
-              className={`transition ${openAdmin ? "rotate-180" : ""}`}
+              className={`
+                transition
+                ${adminAbierto ? "rotate-180" : ""}
+              `}
             />
           )}
         </button>
 
-        {openAdmin && !collapsed && (
-          <div className="ml-6 space-y-1">
+        {adminAbierto && !collapsed && (
+          <div
+            className="
+              ml-6
+              space-y-1
+            "
+          >
             <Link
               to="/dashboard/usuarios"
-              className={`
-                flex
-                items-center
-                gap-2
-                p-2
-                rounded
-                transition
-                ${
-                  isActive("/dashboard/usuarios")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }
-              `}
+              className={claseSubItem(isActive("/dashboard/usuarios"))}
             >
               <Users size={16} />
               Usuarios
@@ -202,19 +521,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/roles"
-              className={`
-                flex
-                items-center
-                gap-2
-                p-2
-                rounded
-                transition
-                ${
-                  isActive("/dashboard/roles")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }
-              `}
+              className={claseSubItem(isActive("/dashboard/roles"))}
             >
               <Shield size={16} />
               Roles
@@ -222,23 +529,22 @@ function Sidebar() {
           </div>
         )}
 
-        {/* =========================
-           INVENTARIO
-        ========================= */}
+        {/* =================================================
+            INVENTARIO
+        ================================================= */}
+
         <button
-          onClick={() => setOpenInventario(!openInventario)}
-          className="
-            flex
-            items-center
-            justify-between
-            w-full
-            p-2
-            rounded
-            hover:bg-[var(--color-primary)]
-            transition
-          "
+          type="button"
+          onClick={() => setOpenInventario((prev) => !prev)}
+          className={claseBotonSeccion(inventarioAbierto)}
         >
-          <span className="flex items-center gap-3">
+          <span
+            className="
+              flex
+              items-center
+              gap-3
+            "
+          >
             <Package size={18} />
 
             {!collapsed && "Inventario"}
@@ -247,141 +553,118 @@ function Sidebar() {
           {!collapsed && (
             <ChevronDown
               size={16}
-              className={`transition ${openInventario ? "rotate-180" : ""}`}
+              className={`
+                transition
+                ${inventarioAbierto ? "rotate-180" : ""}
+              `}
             />
           )}
         </button>
 
-        {openInventario && !collapsed && (
-          <div className="ml-6 space-y-1">
+        {inventarioAbierto && !collapsed && (
+          <div
+            className="
+              ml-6
+              space-y-1
+            "
+          >
             <Link
               to="/dashboard/categorias"
-              className="
-                block
-                p-2
-                rounded
-                hover:bg-[var(--color-primary)]
-                transition
-              "
+              className={claseSubItem(isActive("/dashboard/categorias"))}
             >
               Categorías
             </Link>
 
             <Link
-              to="/dashboard/activos"
-              className="
-                block
-                p-2
-                rounded
-                hover:bg-[var(--color-primary)]
-                transition
-              "
-            >
-              Activos
-            </Link>
-
-            <Link
               to="/dashboard/ubicaciones"
-              className="
-                block
-                p-2
-                rounded
-                hover:bg-[var(--color-primary)]
-                transition
-              "
+              className={claseSubItem(isActive("/dashboard/ubicaciones"))}
             >
               Ubicaciones
             </Link>
 
             <Link
+              to="/dashboard/activos"
+              className={claseSubItem(isActive("/dashboard/activos"))}
+            >
+              Activos
+            </Link>
+
+            <Link
               to="/dashboard/movimientos"
-              className="
-                block
-                p-2
-                rounded
-                hover:bg-[var(--color-primary)]
-                transition
-              "
+              className={claseSubItem(isActive("/dashboard/movimientos"))}
             >
               Movimientos
             </Link>
 
             <Link
               to="/dashboard/reportes/inventario"
-              className="
-                block
-                p-2
-                rounded
-                hover:bg-[var(--color-primary)]
-                transition
-              "
+              className={claseSubItem(
+                isActive("/dashboard/reportes/inventario"),
+              )}
             >
               Reportes
             </Link>
           </div>
         )}
-        {/* =========================
-           CLIENTES
-        ========================= */}
+
+        {/* =================================================
+            CLIENTES
+        ================================================= */}
+
         <Link
           to="/dashboard/clientes"
           title="Clientes"
-          className={`flex items-center gap-3 p-2 rounded transition
-            ${
-              isActive("/dashboard/clientes")
-                ? "bg-[var(--color-primary)]"
-                : "hover:bg-[var(--color-primary)]"
-            }`}
+          className={claseItemPrincipal(isActive("/dashboard/clientes"))}
         >
           <FileText size={18} />
 
           {!collapsed && "Clientes"}
         </Link>
 
-        {/* =========================
-           CONTRATOS
-        ========================= */}
+        {/* =================================================
+            CONTRATOS
+        ================================================= */}
+
         <Link
           to="/dashboard/contratos"
           title="Contratos"
-          className={`flex items-center gap-3 p-2 rounded transition
-            ${
-              isActive("/dashboard/contratos")
-                ? "bg-[var(--color-primary)]"
-                : "hover:bg-[var(--color-primary)]"
-            }`}
+          className={claseItemPrincipal(isActive("/dashboard/contratos"))}
         >
           <FileText size={18} />
 
           {!collapsed && "Contratos"}
         </Link>
 
-        {/* =========================
-           DEVOLUCIONES
-        ========================= */}
+        {/* =================================================
+            DEVOLUCIONES
+        ================================================= */}
+
         <Link
           to="/dashboard/devoluciones"
           title="Devoluciones"
-          className={`flex items-center gap-3 p-2 rounded transition
-            ${
-              isActive("/dashboard/devoluciones")
-                ? "bg-[var(--color-primary)]"
-                : "hover:bg-[var(--color-primary)]"
-            }`}
+          className={claseItemPrincipal(isActive("/dashboard/devoluciones"))}
         >
           <BarChart3 size={18} />
 
           {!collapsed && "Devoluciones"}
         </Link>
 
-        {/* =========================
-           GESTIÓN OBRAS
-        ========================= */}
+        {/* =================================================
+            GESTIÓN OBRAS
+        ================================================= */}
+
         <button
-          onClick={() => setOpenObras(!openObras)}
-          className="flex items-center justify-between w-full p-2 rounded hover:bg-[var(--color-primary)] transition"
+          type="button"
+          onClick={() => setOpenObras((prev) => !prev)}
+          className={claseBotonSeccion(obrasAbierto)}
         >
-          <span className="flex items-center gap-3">
+          <span
+            className="
+              flex
+              items-center
+              gap-3
+            "
+          >
             <Hammer size={18} />
 
             {!collapsed && "Gestión Obras"}
@@ -390,21 +673,24 @@ function Sidebar() {
           {!collapsed && (
             <ChevronDown
               size={16}
-              className={`transition ${openObras ? "rotate-180" : ""}`}
+              className={`
+                transition
+                ${obrasAbierto ? "rotate-180" : ""}
+              `}
             />
           )}
         </button>
 
-        {openObras && !collapsed && (
-          <div className="ml-6 space-y-1">
+        {obrasAbierto && !collapsed && (
+          <div
+            className="
+              ml-6
+              space-y-1
+            "
+          >
             <Link
               to="/dashboard/empleados"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/empleados")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isSectionActive("/dashboard/empleados"))}
             >
               <Users size={16} />
               Empleados
@@ -412,12 +698,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/obras"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/obras")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isSectionActive("/dashboard/obras"))}
             >
               <HardHat size={16} />
               Obras
@@ -425,25 +706,23 @@ function Sidebar() {
 
             <Link
               to="/dashboard/control-diario"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/control-diario")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/control-diario"))}
             >
               <ClipboardList size={16} />
               Control Diario
             </Link>
 
             <Link
+              to="/dashboard/asistencia"
+              className={claseSubItem(isSectionActive("/dashboard/asistencia"))}
+            >
+              <ClipboardCheck size={16} />
+              Asistencia
+            </Link>
+
+            <Link
               to="/dashboard/gastos-obra"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/gastos-obra")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/gastos-obra"))}
             >
               <Receipt size={16} />
               Gastos Obra
@@ -451,12 +730,9 @@ function Sidebar() {
 
             <Link
               to="/dashboard/reporte-gastos-obra"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/reporte-gastos-obra")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(
+                isActive("/dashboard/reporte-gastos-obra"),
+              )}
             >
               <BarChart3 size={16} />
               Reportes Obras
@@ -464,14 +740,22 @@ function Sidebar() {
           </div>
         )}
 
-        {/* =========================
-           FINANZAS
-        ========================= */}
+        {/* =================================================
+            FINANZAS
+        ================================================= */}
+
         <button
-          onClick={() => setOpenFinanzas(!openFinanzas)}
-          className="flex items-center justify-between w-full p-2 rounded hover:bg-[var(--color-primary)] transition"
+          type="button"
+          onClick={() => setOpenFinanzas((prev) => !prev)}
+          className={claseBotonSeccion(finanzasAbierto)}
         >
-          <span className="flex items-center gap-3">
+          <span
+            className="
+              flex
+              items-center
+              gap-3
+            "
+          >
             <Landmark size={18} />
 
             {!collapsed && "Finanzas"}
@@ -480,21 +764,26 @@ function Sidebar() {
           {!collapsed && (
             <ChevronDown
               size={16}
-              className={`transition ${openFinanzas ? "rotate-180" : ""}`}
+              className={`
+                transition
+                ${finanzasAbierto ? "rotate-180" : ""}
+              `}
             />
           )}
         </button>
 
-        {openFinanzas && !collapsed && (
-          <div className="ml-6 space-y-1">
+        {finanzasAbierto && !collapsed && (
+          <div
+            className="
+              ml-6
+              space-y-1
+            "
+          >
             <Link
               to="/dashboard/dashboardfinanciero"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/dashboardfinanciero")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(
+                isActive("/dashboard/dashboardfinanciero"),
+              )}
             >
               <LayoutDashboard size={16} />
               Dashboard Financiero
@@ -502,12 +791,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/cuentas"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/cuentas")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/cuentas"))}
             >
               <Wallet size={16} />
               Cuentas
@@ -515,12 +799,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/ingresos"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/ingresos")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/ingresos"))}
             >
               <DollarSign size={16} />
               Ingresos
@@ -528,12 +807,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/egresos"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/egresos")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/egresos"))}
             >
               <Receipt size={16} />
               Egresos
@@ -541,12 +815,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/transferencias"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/transferencias")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/transferencias"))}
             >
               <ArrowLeftRight size={16} />
               Transferencias
@@ -554,12 +823,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/flujo-de-caja"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/flujo-de-caja")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/flujo-de-caja"))}
             >
               <TrendingUp size={16} />
               Flujo Caja
@@ -567,12 +831,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/utilidadmensual"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/utilidadmensual")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/utilidadmensual"))}
             >
               <BarChart3 size={16} />
               Utilidad Mensual
@@ -580,12 +839,7 @@ function Sidebar() {
 
             <Link
               to="/dashboard/cierres"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/cierres")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/cierres"))}
             >
               <CalendarDays size={16} />
               Cierres
@@ -593,26 +847,30 @@ function Sidebar() {
 
             <Link
               to="/dashboard/periodos"
-              className={`flex items-center gap-2 p-2 rounded transition
-                ${
-                  isActive("/dashboard/periodos")
-                    ? "bg-[var(--color-primary)]"
-                    : "hover:bg-[var(--color-primary)]"
-                }`}
+              className={claseSubItem(isActive("/dashboard/periodos"))}
             >
               <Lock size={16} />
               Periodos
             </Link>
           </div>
         )}
-        {/* =========================
-           PERSONAL
-        ========================= */}
+
+        {/* =================================================
+            PERSONAL
+        ================================================= */}
+
         <button
-          onClick={() => setOpenPersonal(!openPersonal)}
-          className="flex items-center justify-between w-full p-2 rounded hover:bg-[var(--color-primary)] transition"
+          type="button"
+          onClick={() => setOpenPersonal((prev) => !prev)}
+          className={claseBotonSeccion(personalAbierto)}
         >
-          <span className="flex items-center gap-3">
+          <span
+            className="
+              flex
+              items-center
+              gap-3
+            "
+          >
             <Wallet size={18} />
 
             {!collapsed && "Personal"}
@@ -621,20 +879,24 @@ function Sidebar() {
           {!collapsed && (
             <ChevronDown
               size={16}
-              className={`transition ${openPersonal ? "rotate-180" : ""}`}
+              className={`
+                transition
+                ${personalAbierto ? "rotate-180" : ""}
+              `}
             />
           )}
         </button>
 
-        {openPersonal && !collapsed && (
-          <div className="ml-6 space-y-1">
+        {personalAbierto && !collapsed && (
+          <div
+            className="
+              ml-6
+              space-y-1
+            "
+          >
             <Link
               to="/dashboard/pagos-empleados"
-              className={`flex items-center gap-2 p-2 rounded transition ${
-                isActive("/dashboard/pagos-empleados")
-                  ? "bg-[var(--color-primary)]"
-                  : "hover:bg-[var(--color-primary)]"
-              }`}
+              className={claseSubItem(isActive("/dashboard/pagos-empleados"))}
             >
               <Wallet size={16} />
               Pagos Empleados
@@ -642,11 +904,9 @@ function Sidebar() {
 
             <Link
               to="/dashboard/reportes-empleados"
-              className={`flex items-center gap-2 p-2 rounded transition ${
-                isActive("/dashboard/reportes-empleados")
-                  ? "bg-[var(--color-primary)]"
-                  : "hover:bg-[var(--color-primary)]"
-              }`}
+              className={claseSubItem(
+                isActive("/dashboard/reportes-empleados"),
+              )}
             >
               <BarChart3 size={16} />
               Reportes Personal
@@ -654,65 +914,223 @@ function Sidebar() {
           </div>
         )}
 
-        {/* =========================
-           SOCIOS
-        ========================= */}
-        <button
-          onClick={() => setOpenSocios(!openSocios)}
-          className="flex items-center justify-between w-full p-2 rounded hover:bg-[var(--color-primary)] transition"
-        >
-          <span className="flex items-center gap-3">
-            <HandCoins size={18} />
+        {/* =================================================
+            ADMINISTRACIÓN DE SOCIOS
+        ================================================= */}
 
-            {!collapsed && "Socios"}
-          </span>
+        {puedeAdministrarSocios && (
+          <>
+            {!collapsed && (
+              <div
+                className="
+                  pt-3
+                  pb-1
+                "
+              >
+                <div
+                  className="
+                    border-t
+                    border-gray-700
+                  "
+                />
 
-          {!collapsed && (
-            <ChevronDown
-              size={16}
-              className={`transition ${openSocios ? "rotate-180" : ""}`}
-            />
-          )}
-        </button>
+                <p
+                  className="
+                    mt-3
+                    px-2
+                    text-[11px]
+                    uppercase
+                    tracking-wider
+                    text-gray-400
+                    font-semibold
+                  "
+                >
+                  Administración societaria
+                </p>
+              </div>
+            )}
 
-        {openSocios && !collapsed && (
-          <div className="ml-6 space-y-1">
-            <Link
-              to="/dashboard/socios"
-              className={`flex items-center gap-2 p-2 rounded transition ${
-                isActive("/dashboard/socios")
-                  ? "bg-[var(--color-primary)]"
-                  : "hover:bg-[var(--color-primary)]"
-              }`}
+            <button
+              type="button"
+              onClick={() => setOpenSocios((prev) => !prev)}
+              className={claseBotonSeccion(sociosAbierto)}
             >
-              <Users size={16} />
-              Socios
-            </Link>
+              <span
+                className="
+                  flex
+                  items-center
+                  gap-3
+                "
+              >
+                <HandCoins size={18} />
 
-            <Link
-              to="/dashboard/socios/aportaciones"
-              className={`flex items-center gap-2 p-2 rounded transition ${
-                isActive("/dashboard/socios/aportaciones")
-                  ? "bg-[var(--color-primary)]"
-                  : "hover:bg-[var(--color-primary)]"
-              }`}
-            >
-              <DollarSign size={16} />
-              Aportes
-            </Link>
+                {!collapsed && "Socios"}
+              </span>
 
-            <Link
-              to="/dashboard/socios/utilidades"
-              className={`flex items-center gap-2 p-2 rounded transition ${
-                isActive("/dashboard/socios/utilidades")
-                  ? "bg-[var(--color-primary)]"
-                  : "hover:bg-[var(--color-primary)]"
-              }`}
+              {!collapsed && (
+                <ChevronDown
+                  size={16}
+                  className={`
+                    transition
+                    ${sociosAbierto ? "rotate-180" : ""}
+                  `}
+                />
+              )}
+            </button>
+
+            {sociosAbierto && !collapsed && (
+              <div
+                className="
+                  ml-6
+                  space-y-1
+                "
+              >
+                <Link
+                  to="/dashboard/socios"
+                  className={claseSubItem(isActive("/dashboard/socios"))}
+                >
+                  <Users size={16} />
+                  Socios
+                </Link>
+
+                <Link
+                  to="/dashboard/socios/aportaciones"
+                  className={claseSubItem(
+                    isActive("/dashboard/socios/aportaciones"),
+                  )}
+                >
+                  <DollarSign size={16} />
+                  Aportes
+                </Link>
+
+                <Link
+                  to="/dashboard/socios/utilidades"
+                  className={claseSubItem(
+                    isActive("/dashboard/socios/utilidades"),
+                  )}
+                >
+                  <TrendingUp size={16} />
+                  Utilidades
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* =================================================
+            PORTAL PERSONAL DEL SOCIO
+        ================================================= */}
+
+        {esSocio && (
+          <>
+            {!collapsed && (
+              <div
+                className="
+                  pt-3
+                  pb-1
+                "
+              >
+                <div
+                  className="
+                    border-t
+                    border-gray-700
+                  "
+                />
+
+                <p
+                  className="
+                    mt-3
+                    px-2
+                    text-[11px]
+                    uppercase
+                    tracking-wider
+                    text-gray-400
+                    font-semibold
+                  "
+                >
+                  Mi información
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setOpenPortalSocio((prev) => !prev)}
+              title="Mi Portal"
+              className={claseBotonSeccion(
+                isSectionActive("/dashboard/mi-portal"),
+              )}
             >
-              <TrendingUp size={16} />
-              Utilidades
-            </Link>
-          </div>
+              <span
+                className="
+                  flex
+                  items-center
+                  gap-3
+                "
+              >
+                <UserCircle size={18} />
+
+                {!collapsed && "Mi Portal"}
+              </span>
+
+              {!collapsed && (
+                <ChevronDown
+                  size={16}
+                  className={`
+                    transition
+                    ${portalSocioAbierto ? "rotate-180" : ""}
+                  `}
+                />
+              )}
+            </button>
+
+            {portalSocioAbierto && !collapsed && (
+              <div
+                className="
+                  ml-6
+                  space-y-1
+                "
+              >
+                <Link
+                  to="/dashboard/mi-portal"
+                  className={claseSubItem(isActive("/dashboard/mi-portal"))}
+                >
+                  <LayoutDashboard size={16} />
+                  Resumen
+                </Link>
+
+                <Link
+                  to="/dashboard/mi-portal/perfil"
+                  className={claseSubItem(
+                    isActive("/dashboard/mi-portal/perfil"),
+                  )}
+                >
+                  <UserCircle size={16} />
+                  Mi Perfil
+                </Link>
+
+                <Link
+                  to="/dashboard/mi-portal/aportes"
+                  className={claseSubItem(
+                    isActive("/dashboard/mi-portal/aportes"),
+                  )}
+                >
+                  <PiggyBank size={16} />
+                  Mis Aportes
+                </Link>
+
+                <Link
+                  to="/dashboard/mi-portal/utilidades"
+                  className={claseSubItem(
+                    isActive("/dashboard/mi-portal/utilidades"),
+                  )}
+                >
+                  <TrendingUp size={16} />
+                  Mis Utilidades
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </nav>
     </aside>

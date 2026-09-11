@@ -1,8 +1,21 @@
 const { pool } = require("../../config/db");
 
-/* =========================
+/* =====================================================
+   UTILIDAD: CONVERTIR Y VALIDAR NÚMEROS
+===================================================== */
+const convertirNumero = (valor, nombreCampo) => {
+    const numero = Number(valor);
+
+    if (!Number.isFinite(numero)) {
+        throw new Error(`${nombreCampo} no es un número válido`);
+    }
+
+    return numero;
+};
+
+/* =====================================================
    CREAR CONTRATO
-========================= */
+===================================================== */
 const crearContrato = async (data) => {
     const result = await pool.query(
         `INSERT INTO contratos_alquiler
@@ -17,7 +30,7 @@ const crearContrato = async (data) => {
             saldo_pendiente,
             observaciones
         )
-        VALUES ($1,$2,$3,$4,$5,0,0,0,$6)
+        VALUES ($1, $2, $3, $4, $5, 0, 0, 0, $6)
         RETURNING *`,
         [
             data.numero_contrato,
@@ -32,14 +45,15 @@ const crearContrato = async (data) => {
     return result.rows[0];
 };
 
-/* =========================
+/* =====================================================
    LISTAR CONTRATOS
-========================= */
+===================================================== */
 const listarContratos = async () => {
-    const result = await pool.query(`
-        SELECT
+    const result = await pool.query(
+        `SELECT
             c.id,
             c.numero_contrato,
+            c.cliente_id,
             cl.nombre AS cliente,
             c.fecha_inicio,
             c.fecha_fin,
@@ -47,41 +61,109 @@ const listarContratos = async () => {
             c.total,
             c.pagado,
             c.saldo_pendiente,
-            c.fecha_creacion
+            c.observaciones,
+            c.fecha_creacion,
+            GREATEST(
+                c.fecha_fin::date - c.fecha_inicio::date,
+                1
+            ) AS dias_contrato
         FROM contratos_alquiler c
-        JOIN clientes cl ON cl.id = c.cliente_id
-        ORDER BY c.fecha_creacion DESC
-    `);
+        INNER JOIN clientes cl
+            ON cl.id = c.cliente_id
+        ORDER BY c.fecha_creacion DESC`
+    );
 
     return result.rows;
 };
 
-/* =========================
+/* =====================================================
    AGREGAR ACTIVO A CONTRATO
-========================= */
-const agregarActivoContrato = async (contrato_id, data) => {
+===================================================== */
+const agregarActivoContrato = async (contratoId, data) => {
     const client = await pool.connect();
 
     try {
         await client.query("BEGIN");
 
-        const contratoRes = await client.query(
-            `SELECT id, pagado
-             FROM contratos_alquiler
-             WHERE id = $1`,
-            [contrato_id]
+        /* -------------------------------------------------
+           1. Obtener y bloquear el contrato
+        ------------------------------------------------- */
+        const contratoResult = await client.query(
+            `SELECT
+                id,
+                numero_contrato,
+                fecha_inicio,
+                fecha_fin,
+                estado,
+                total,
+                pagado,
+                saldo_pendiente,
+                GREATEST(
+                    fecha_fin::date - fecha_inicio::date,
+                    1
+                ) AS dias_contrato
+            FROM contratos_alquiler
+            WHERE id = $1
+            FOR UPDATE`,
+            [contratoId]
         );
 
-        if (contratoRes.rows.length === 0) {
+        if (contratoResult.rows.length === 0) {
             throw new Error("Contrato no encontrado");
         }
 
-        const pagadoActual = Number(contratoRes.rows[0].pagado || 0);
+        const contrato = contratoResult.rows[0];
 
+        if (contrato.estado !== "activo") {
+            throw new Error(
+                "Solo se pueden agregar activos a contratos activos"
+            );
+        }
+
+        const cantidad = convertirNumero(
+            data.cantidad,
+            "La cantidad"
+        );
+
+        const precioDiario = convertirNumero(
+            data.precio_diario,
+            "El precio diario"
+        );
+
+        const diasContrato = convertirNumero(
+            contrato.dias_contrato,
+            "La duración del contrato"
+        );
+
+        const pagadoActual = convertirNumero(
+            contrato.pagado || 0,
+            "El valor pagado"
+        );
+
+        if (!Number.isInteger(cantidad) || cantidad <= 0) {
+            throw new Error(
+                "La cantidad debe ser un número entero mayor que cero"
+            );
+        }
+
+        if (precioDiario <= 0) {
+            throw new Error(
+                "El precio diario debe ser mayor que cero"
+            );
+        }
+
+        /* -------------------------------------------------
+           2. Obtener y bloquear el activo
+        ------------------------------------------------- */
         const activoResult = await client.query(
-            `SELECT cantidad_total
-             FROM activos
-             WHERE id = $1`,
+            `SELECT
+                id,
+                codigo,
+                nombre,
+                cantidad_total
+            FROM activos
+            WHERE id = $1
+            FOR UPDATE`,
             [data.activo_id]
         );
 
@@ -89,72 +171,169 @@ const agregarActivoContrato = async (contrato_id, data) => {
             throw new Error("El activo no existe");
         }
 
-        const stockActual = Number(activoResult.rows[0].cantidad_total);
+        const activo = activoResult.rows[0];
 
-        if (Number(data.cantidad) > stockActual) {
-            throw new Error("Stock insuficiente");
+        const stockActual = convertirNumero(
+            activo.cantidad_total,
+            "El stock disponible"
+        );
+
+        if (cantidad > stockActual) {
+            throw new Error(
+                `Stock insuficiente para ${activo.nombre}. ` +
+                `Disponible: ${stockActual}`
+            );
         }
 
-        const subtotal = Number(data.cantidad) * Number(data.precio_diario);
+        /* -------------------------------------------------
+           3. Calcular subtotal del activo
+           
+           cantidad × precio diario × días del contrato
+        ------------------------------------------------- */
+        const subtotal = Number(
+            (
+                cantidad *
+                precioDiario *
+                diasContrato
+            ).toFixed(2)
+        );
+        console.log("==================================");
+        console.log("CÁLCULO DEL ALQUILER");
+        console.log({
+            contratoId,
+            cantidad,
+            precioDiario,
+            diasContrato,
+            subtotal
+        });
+        console.log("==================================");
 
-        await client.query(
+
+        /* -------------------------------------------------
+           4. Insertar detalle del contrato
+        ------------------------------------------------- */
+        const detalleResult = await client.query(
             `INSERT INTO detalles_contrato
-            (contrato_id, activo_id, cantidad, precio_diario, subtotal)
-            VALUES ($1,$2,$3,$4,$5)`,
-            [
+            (
                 contrato_id,
+                activo_id,
+                cantidad,
+                precio_diario,
+                subtotal
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *`,
+            [
+                contratoId,
                 data.activo_id,
-                data.cantidad,
-                data.precio_diario,
+                cantidad,
+                precioDiario,
                 subtotal
             ]
         );
 
+        /* -------------------------------------------------
+           5. Descontar stock
+        ------------------------------------------------- */
         await client.query(
             `UPDATE activos
-             SET cantidad_total = cantidad_total - $1
-             WHERE id = $2`,
-            [data.cantidad, data.activo_id]
-        );
-
-        await client.query(
-            `INSERT INTO movimientos_inventario
-            (activo_id, tipo_movimiento, cantidad, motivo, referencia)
-            VALUES ($1,'salida',$2,$3,$4)`,
+            SET cantidad_total = cantidad_total - $1
+            WHERE id = $2`,
             [
-                data.activo_id,
-                data.cantidad,
-                "Salida por contrato de alquiler",
-                `Contrato ${contrato_id}`
+                cantidad,
+                data.activo_id
             ]
         );
 
-        const totalRes = await client.query(
-            `SELECT COALESCE(SUM(subtotal),0) AS total
-             FROM detalles_contrato
-             WHERE contrato_id = $1`,
-            [contrato_id]
+        /* -------------------------------------------------
+           6. Registrar movimiento de inventario
+        ------------------------------------------------- */
+        await client.query(
+            `INSERT INTO movimientos_inventario
+            (
+                activo_id,
+                tipo_movimiento,
+                cantidad,
+                motivo,
+                referencia
+            )
+            VALUES ($1, 'salida', $2, $3, $4)`,
+            [
+                data.activo_id,
+                cantidad,
+                "Salida por contrato de alquiler",
+                `Contrato ${contrato.numero_contrato || contratoId}`
+            ]
         );
 
-        const nuevoTotal = Number(totalRes.rows[0].total);
-        const nuevoSaldoPendiente = Math.max(nuevoTotal - pagadoActual, 0);
+        /* -------------------------------------------------
+           7. Recalcular total del contrato
+        ------------------------------------------------- */
+        const totalResult = await client.query(
+            `SELECT
+                COALESCE(SUM(subtotal), 0) AS total
+            FROM detalles_contrato
+            WHERE contrato_id = $1`,
+            [contratoId]
+        );
 
-        await client.query(
+        const nuevoTotal = Number(
+            Number(totalResult.rows[0].total || 0).toFixed(2)
+        );
+
+        /*
+         * En esta etapa solamente se considera el alquiler.
+         * Las penalidades se sumarán posteriormente desde
+         * el proceso de devolución.
+         */
+        const nuevoSaldoPendiente = Number(
+            Math.max(
+                nuevoTotal - pagadoActual,
+                0
+            ).toFixed(2)
+        );
+
+        /* -------------------------------------------------
+           8. Actualizar resumen financiero del contrato
+        ------------------------------------------------- */
+        const contratoActualizadoResult = await client.query(
             `UPDATE contratos_alquiler
-             SET
+            SET
                 total = $2,
                 saldo_pendiente = $3
-             WHERE id = $1`,
-            [contrato_id, nuevoTotal, nuevoSaldoPendiente]
+            WHERE id = $1
+            RETURNING
+                id,
+                numero_contrato,
+                total,
+                pagado,
+                saldo_pendiente,
+                estado`,
+            [
+                contratoId,
+                nuevoTotal,
+                nuevoSaldoPendiente
+            ]
         );
 
         await client.query("COMMIT");
 
         return {
-            contrato_id,
-            total: nuevoTotal,
-            pagado: pagadoActual,
-            saldo_pendiente: nuevoSaldoPendiente
+            contrato: contratoActualizadoResult.rows[0],
+
+            detalle: {
+                ...detalleResult.rows[0],
+                activo: activo.nombre,
+                codigo: activo.codigo,
+                dias: diasContrato
+            },
+
+            calculo: {
+                cantidad,
+                precio_diario: precioDiario,
+                dias: diasContrato,
+                subtotal
+            }
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -164,14 +343,15 @@ const agregarActivoContrato = async (contrato_id, data) => {
     }
 };
 
-/* =========================
+/* =====================================================
    OBTENER CONTRATO POR ID
-========================= */
+===================================================== */
 const obtenerContratoPorId = async (id) => {
     const contratoResult = await pool.query(
         `SELECT
             c.id,
             c.numero_contrato,
+            c.cliente_id,
             cl.nombre AS cliente,
             c.fecha_inicio,
             c.fecha_fin,
@@ -179,10 +359,16 @@ const obtenerContratoPorId = async (id) => {
             c.total,
             c.pagado,
             c.saldo_pendiente,
-            c.observaciones
-         FROM contratos_alquiler c
-         JOIN clientes cl ON cl.id = c.cliente_id
-         WHERE c.id = $1`,
+            c.observaciones,
+            c.fecha_creacion,
+            GREATEST(
+                c.fecha_fin::date - c.fecha_inicio::date,
+                1
+            ) AS dias_contrato
+        FROM contratos_alquiler c
+        INNER JOIN clientes cl
+            ON cl.id = c.cliente_id
+        WHERE c.id = $1`,
         [id]
     );
 
@@ -192,33 +378,54 @@ const obtenerContratoPorId = async (id) => {
 
     const contrato = contratoResult.rows[0];
 
+    /* -------------------------------------------------
+       Obtener activos con subtotal guardado en BD
+    ------------------------------------------------- */
     const activosResult = await pool.query(
         `SELECT
+            dc.id AS detalle_id,
             a.id,
             a.codigo,
             a.nombre,
             dc.cantidad,
             dc.precio_diario AS precio_dia,
+            GREATEST(
+                c.fecha_fin::date - c.fecha_inicio::date,
+                1
+            ) AS dias,
             dc.subtotal
-         FROM detalles_contrato dc
-         JOIN activos a ON dc.activo_id = a.id
-         WHERE dc.contrato_id = $1`,
+        FROM detalles_contrato dc
+        INNER JOIN activos a
+            ON a.id = dc.activo_id
+        INNER JOIN contratos_alquiler c
+            ON c.id = dc.contrato_id
+        WHERE dc.contrato_id = $1
+        ORDER BY a.nombre ASC`,
         [id]
     );
 
+    /* -------------------------------------------------
+       Obtener historial de pagos
+    ------------------------------------------------- */
     const pagosResult = await pool.query(
         `SELECT
             pc.id,
+            pc.contrato_id,
+            pc.cuenta_id,
             pc.monto,
             pc.fecha,
             pc.metodo_pago,
             pc.concepto,
             pc.observaciones,
+            pc.fecha_creacion,
             cf.nombre AS cuenta
-         FROM pagos_contratos pc
-         JOIN cuentas_financieras cf ON cf.id = pc.cuenta_id
-         WHERE pc.contrato_id = $1
-         ORDER BY pc.fecha DESC`,
+        FROM pagos_contratos pc
+        INNER JOIN cuentas_financieras cf
+            ON cf.id = pc.cuenta_id
+        WHERE pc.contrato_id = $1
+        ORDER BY
+            pc.fecha DESC,
+            pc.fecha_creacion DESC`,
         [id]
     );
 

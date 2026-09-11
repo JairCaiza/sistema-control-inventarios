@@ -1,5 +1,5 @@
-import { useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import Swal from "sweetalert2";
 
 import {
@@ -9,137 +9,299 @@ import {
   DollarSign,
   CalendarDays,
   Receipt,
+  RotateCcw,
 } from "lucide-react";
 
-import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
+import { FaEye } from "react-icons/fa";
 
-interface Ingreso {
-  id: string;
-  fecha: string;
-  concepto: string;
-  cuenta: string;
-  metodo_pago: string;
-  referencia: string;
-  valor: number;
-  usuario: string;
-  estado: "Confirmado" | "Pendiente" | "Anulado";
-}
+import RegistrarIngresoModal from "../components/RegistrarIngresoModal";
+
+import { getIngresos, type Transaccion } from "../services/transaccionService";
+
+import {
+  getCuentas,
+  type CuentaFinanciera,
+} from "../../cuentas/service/cuentaService";
+
+/* =====================================================
+   FECHA LOCAL ACTUAL
+===================================================== */
+const obtenerFechaActual = (): string => {
+  const hoy = new Date();
+
+  const fechaLocal = new Date(
+    hoy.getTime() - hoy.getTimezoneOffset() * 60 * 1000,
+  );
+
+  return fechaLocal.toISOString().split("T")[0];
+};
+
+/* =====================================================
+   PRIMER DÍA DEL MES
+===================================================== */
+const obtenerPrimerDiaMes = (): string => {
+  const hoy = new Date();
+
+  const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+  const fechaLocal = new Date(
+    primerDia.getTime() - primerDia.getTimezoneOffset() * 60 * 1000,
+  );
+
+  return fechaLocal.toISOString().split("T")[0];
+};
+
+/* =====================================================
+   FORMATEAR DINERO
+===================================================== */
+const formatMoney = (value: number | string | null | undefined): string => {
+  return Number(value || 0).toLocaleString("es-EC", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  });
+};
+
+/* =====================================================
+   FORMATEAR FECHA SIN CAMBIO DE ZONA HORARIA
+===================================================== */
+const formatDate = (value: string | null | undefined): string => {
+  if (!value) return "—";
+
+  const fecha = value.substring(0, 10);
+  const [anio, mes, dia] = fecha.split("-");
+
+  if (!anio || !mes || !dia) {
+    return value;
+  }
+
+  return `${dia}/${mes}/${anio}`;
+};
+
+/* =====================================================
+   FORMATEAR FECHA Y HORA
+===================================================== */
+const formatDateTime = (value: string | null | undefined): string => {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleString("es-EC", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+};
 
 function IngresosPage() {
-  /* =========================
-     DATOS FICTICIOS
-  ========================= */
+  const [ingresos, setIngresos] = useState<Transaccion[]>([]);
+  const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
 
-  const [ingresos] = useState<Ingreso[]>([
-    {
-      id: "ING-001",
-      fecha: "12/06/2026",
-      concepto: "Pago contrato #025",
-      cuenta: "Banco Pichincha",
-      metodo_pago: "Transferencia",
-      referencia: "TRX001",
-      valor: 2500,
-      usuario: "Administrador",
-      estado: "Confirmado",
-    },
-    {
-      id: "ING-002",
-      fecha: "11/06/2026",
-      concepto: "Venta de activo",
-      cuenta: "Caja Chica",
-      metodo_pago: "Efectivo",
-      referencia: "REC145",
-      valor: 350,
-      usuario: "María López",
-      estado: "Confirmado",
-    },
-    {
-      id: "ING-003",
-      fecha: "10/06/2026",
-      concepto: "Abono cliente",
-      cuenta: "Produbanco",
-      metodo_pago: "Cheque",
-      referencia: "CH002",
-      valor: 1100,
-      usuario: "Carlos Pérez",
-      estado: "Pendiente",
-    },
-    {
-      id: "ING-004",
-      fecha: "09/06/2026",
-      concepto: "Pago alquiler maquinaria",
-      cuenta: "Banco Guayaquil",
-      metodo_pago: "Transferencia",
-      referencia: "TRX058",
-      valor: 4200,
-      usuario: "Administrador",
-      estado: "Confirmado",
-    },
-    {
-      id: "ING-005",
-      fecha: "08/06/2026",
-      concepto: "Ingreso anulado",
-      cuenta: "Caja Chica",
-      metodo_pago: "Efectivo",
-      referencia: "REC102",
-      valor: 180,
-      usuario: "María López",
-      estado: "Anulado",
-    },
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  /* =========================
-     KPIs FICTICIOS
-  ========================= */
+  const [busqueda, setBusqueda] = useState("");
+  const [cuentaFiltro, setCuentaFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
 
-  const resumen = {
-    ingresosMes: 18900,
-    ingresosHoy: 1250,
-    promedioDiario: 630,
-    transacciones: ingresos.length,
+  /* =====================================================
+     CARGAR DATOS REALES
+  ===================================================== */
+  const cargarDatos = async () => {
+    try {
+      setLoading(true);
+
+      const [ingresosData, cuentasData] = await Promise.all([
+        getIngresos(),
+        getCuentas(),
+      ]);
+
+      setIngresos(ingresosData);
+      setCuentas(cuentasData);
+    } catch (error: unknown) {
+      let mensaje = "No se pudieron cargar los ingresos.";
+
+      if (axios.isAxiosError(error)) {
+        mensaje =
+          error.response?.data?.message ??
+          error.response?.data?.error ??
+          mensaje;
+      }
+
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: mensaje,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /* =========================
-     ACCIONES (PLANTILLA)
-  ========================= */
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
-  const handleNuevoIngreso = () => {
-    Swal.fire("Plantilla", "Aquí se abrirá el modal de nuevo ingreso.", "info");
+  /* =====================================================
+     FILTRAR INGRESOS
+  ===================================================== */
+  const ingresosFiltrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+
+    return ingresos.filter((ingreso) => {
+      const descripcion = ingreso.descripcion?.toLowerCase() ?? "";
+
+      const cuentaNombre = ingreso.cuenta_nombre?.toLowerCase() ?? "";
+
+      const origen = ingreso.origen_modulo?.toLowerCase() ?? "";
+
+      const referencia = ingreso.referencia_id?.toLowerCase() ?? "";
+
+      const coincideBusqueda =
+        !texto ||
+        descripcion.includes(texto) ||
+        cuentaNombre.includes(texto) ||
+        origen.includes(texto) ||
+        referencia.includes(texto) ||
+        ingreso.id.toLowerCase().includes(texto);
+
+      const coincideCuenta =
+        !cuentaFiltro || ingreso.cuenta_id === cuentaFiltro;
+
+      const fechaIngreso = ingreso.fecha?.substring(0, 10) ?? "";
+
+      const coincideDesde = !fechaDesde || fechaIngreso >= fechaDesde;
+
+      const coincideHasta = !fechaHasta || fechaIngreso <= fechaHasta;
+
+      return (
+        coincideBusqueda && coincideCuenta && coincideDesde && coincideHasta
+      );
+    });
+  }, [ingresos, busqueda, cuentaFiltro, fechaDesde, fechaHasta]);
+
+  /* =====================================================
+     INDICADORES
+  ===================================================== */
+  const resumen = useMemo(() => {
+    const hoy = obtenerFechaActual();
+    const primerDiaMes = obtenerPrimerDiaMes();
+
+    const ingresosMes = ingresos.filter((ingreso) => {
+      const fecha = ingreso.fecha?.substring(0, 10) ?? "";
+
+      return fecha >= primerDiaMes && fecha <= hoy;
+    });
+
+    const ingresosHoy = ingresos.filter(
+      (ingreso) => ingreso.fecha?.substring(0, 10) === hoy,
+    );
+
+    const totalMes = ingresosMes.reduce(
+      (acumulado, ingreso) => acumulado + Number(ingreso.monto || 0),
+      0,
+    );
+
+    const totalHoy = ingresosHoy.reduce(
+      (acumulado, ingreso) => acumulado + Number(ingreso.monto || 0),
+      0,
+    );
+
+    const diaActual = new Date().getDate();
+
+    const promedioDiario = diaActual > 0 ? totalMes / diaActual : 0;
+
+    return {
+      ingresosMes: totalMes,
+      ingresosHoy: totalHoy,
+      promedioDiario,
+      transacciones: ingresos.length,
+    };
+  }, [ingresos]);
+
+  const totalFiltrado = useMemo(() => {
+    return ingresosFiltrados.reduce(
+      (acumulado, ingreso) => acumulado + Number(ingreso.monto || 0),
+      0,
+    );
+  }, [ingresosFiltrados]);
+
+  /* =====================================================
+     LIMPIAR FILTROS
+  ===================================================== */
+  const limpiarFiltros = () => {
+    setBusqueda("");
+    setCuentaFiltro("");
+    setFechaDesde("");
+    setFechaHasta("");
   };
 
-  const handleExportarPDF = () => {
-    Swal.fire("Plantilla", "Aquí irá la exportación PDF.", "info");
+  /* =====================================================
+     VER DETALLE
+  ===================================================== */
+  const handleView = async (ingreso: Transaccion) => {
+    await Swal.fire({
+      icon: "info",
+      title: "Detalle del ingreso",
+      html: `
+        <div style="text-align:left; line-height:1.8">
+          <p>
+            <strong>Cuenta:</strong>
+            ${ingreso.cuenta_nombre ?? "—"}
+          </p>
+
+          <p>
+            <strong>Fecha:</strong>
+            ${formatDate(ingreso.fecha)}
+          </p>
+
+          <p>
+            <strong>Monto:</strong>
+            ${formatMoney(ingreso.monto)}
+          </p>
+
+          <p>
+            <strong>Descripción:</strong>
+            ${ingreso.descripcion ?? "—"}
+          </p>
+
+          <p>
+            <strong>Origen:</strong>
+            ${ingreso.origen_modulo ?? "manual"}
+          </p>
+
+          <p>
+            <strong>Referencia:</strong>
+            ${ingreso.referencia_id ?? "—"}
+          </p>
+
+          <p>
+            <strong>Registrado:</strong>
+            ${formatDateTime(ingreso.fecha_creacion)}
+          </p>
+        </div>
+      `,
+      confirmButtonText: "Cerrar",
+    });
   };
 
-  const handleView = (id: string) => {
-    Swal.fire("Detalle", `Ver detalle del ingreso ${id}`, "info");
-  };
-
-  const handleEdit = (id: string) => {
-    Swal.fire("Editar", `Editar ingreso ${id}`, "info");
-  };
-
-  const handleDelete = (id: string) => {
-    Swal.fire({
-      title: "¿Eliminar ingreso?",
-      text: `Ingreso ${id}`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
+  /* =====================================================
+     EXPORTAR PDF PENDIENTE
+  ===================================================== */
+  const handleExportarPDF = async () => {
+    await Swal.fire({
+      icon: "info",
+      title: "Exportación PDF",
+      text: "La exportación del historial se implementará en la sección de reportes financieros.",
     });
   };
 
   return (
     <div className="space-y-6">
-      {/* =========================
-          HEADER
-      ========================= */}
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+      {/* HEADER */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Ingresos</h1>
 
-          <p className="text-gray-500 mt-1">
+          <p className="mt-1 text-gray-500">
             Gestión y control de ingresos registrados en el sistema.
           </p>
         </div>
@@ -147,658 +309,377 @@ function IngresosPage() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleExportarPDF}
-            className="
-              flex
-              items-center
-              gap-2
-              px-4
-              py-2
-              rounded-lg
-              bg-red-600
-              text-white
-              hover:bg-red-700
-              transition
-            "
+            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
           >
             <FileDown size={18} />
             Exportar PDF
           </button>
 
           <button
-            onClick={handleNuevoIngreso}
-            className="
-              flex
-              items-center
-              gap-2
-              px-4
-              py-2
-              rounded-lg
-              bg-[var(--color-primary)]
-              text-white
-              hover:opacity-90
-              transition
-            "
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90"
           >
             <Plus size={18} />
-            Nuevo Ingreso
+            Nuevo ingreso
           </button>
         </div>
       </div>
 
-      {/* =========================
-          KPIs
-      ========================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {/* INGRESOS MES */}
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+      {/* INDICADORES */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Ingresos del Mes</p>
+              <p className="text-sm text-gray-500">Ingresos del mes</p>
 
-              <h2 className="text-3xl font-bold mt-2">
-                ${resumen.ingresosMes.toLocaleString()}
+              <h2 className="mt-2 text-3xl font-bold">
+                {formatMoney(resumen.ingresosMes)}
               </h2>
 
-              <p className="text-green-600 text-sm mt-2">
-                ↑ 12% respecto al mes anterior
+              <p className="mt-2 text-sm text-green-600">
+                Acumulado del mes actual
               </p>
             </div>
 
-            <div className="bg-green-100 p-3 rounded-full">
+            <div className="rounded-full bg-green-100 p-3">
               <TrendingUp className="text-green-600" />
             </div>
           </div>
         </div>
 
-        {/* INGRESOS HOY */}
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Ingresos Hoy</p>
+              <p className="text-sm text-gray-500">Ingresos de hoy</p>
 
-              <h2 className="text-3xl font-bold mt-2">
-                ${resumen.ingresosHoy.toLocaleString()}
+              <h2 className="mt-2 text-3xl font-bold">
+                {formatMoney(resumen.ingresosHoy)}
               </h2>
 
-              <p className="text-blue-600 text-sm mt-2">
-                Actualizado en tiempo real
+              <p className="mt-2 text-sm text-blue-600">
+                Actualizado con los registros
               </p>
             </div>
 
-            <div className="bg-blue-100 p-3 rounded-full">
+            <div className="rounded-full bg-blue-100 p-3">
               <DollarSign className="text-blue-600" />
             </div>
           </div>
         </div>
 
-        {/* PROMEDIO */}
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Promedio Diario</p>
+              <p className="text-sm text-gray-500">Promedio diario</p>
 
-              <h2 className="text-3xl font-bold mt-2">
-                ${resumen.promedioDiario.toLocaleString()}
+              <h2 className="mt-2 text-3xl font-bold">
+                {formatMoney(resumen.promedioDiario)}
               </h2>
 
-              <p className="text-purple-600 text-sm mt-2">
+              <p className="mt-2 text-sm text-purple-600">
                 Basado en el mes actual
               </p>
             </div>
 
-            <div className="bg-purple-100 p-3 rounded-full">
+            <div className="rounded-full bg-purple-100 p-3">
               <CalendarDays className="text-purple-600" />
             </div>
           </div>
         </div>
 
-        {/* TRANSACCIONES */}
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Transacciones</p>
 
-              <h2 className="text-3xl font-bold mt-2">
+              <h2 className="mt-2 text-3xl font-bold">
                 {resumen.transacciones}
               </h2>
 
-              <p className="text-orange-600 text-sm mt-2">
-                Registros encontrados
+              <p className="mt-2 text-sm text-orange-600">
+                Ingresos registrados
               </p>
             </div>
 
-            <div className="bg-orange-100 p-3 rounded-full">
+            <div className="rounded-full bg-orange-100 p-3">
               <Receipt className="text-orange-600" />
             </div>
           </div>
         </div>
       </div>
-      {/* =========================
-          FILTROS ERP
-      ========================= */}
-      <div className="bg-white rounded-xl shadow border p-6">
-        <div className="flex items-center justify-between mb-6">
+
+      {/* FILTROS */}
+      <div className="rounded-xl border bg-white p-6 shadow">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Filtros</h2>
 
-            <p className="text-sm text-gray-500 mt-1">
-              Filtra ingresos por concepto, cuenta o fechas.
+            <p className="mt-1 text-sm text-gray-500">
+              Filtra ingresos por descripción, cuenta o fechas.
             </p>
           </div>
 
           <button
-            className="
-              px-4
-              py-2
-              rounded-lg
-              border
-              hover:bg-gray-50
-              transition
-            "
+            onClick={limpiarFiltros}
+            className="flex items-center justify-center gap-2 rounded-lg border px-4 py-2 transition hover:bg-gray-50"
           >
+            <RotateCcw size={16} />
             Limpiar filtros
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-          {/* BUSCADOR */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-600">
               Buscar
             </label>
 
             <input
               type="text"
-              placeholder="Concepto o referencia..."
-              className="
-                w-full
-                border
-                rounded-lg
-                px-4
-                py-2
-                focus:outline-none
-                focus:ring-2
-                focus:ring-[var(--color-primary)]
-              "
+              value={busqueda}
+              onChange={(event) => setBusqueda(event.target.value)}
+              placeholder="Descripción o referencia..."
+              className="w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
 
-          {/* CUENTA */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-600">
               Cuenta
             </label>
 
             <select
-              className="
-                w-full
-                border
-                rounded-lg
-                px-4
-                py-2
-                focus:outline-none
-                focus:ring-2
-                focus:ring-[var(--color-primary)]
-              "
+              value={cuentaFiltro}
+              onChange={(event) => setCuentaFiltro(event.target.value)}
+              className="w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             >
-              <option>Todas</option>
-              <option>Banco Pichincha</option>
-              <option>Produbanco</option>
-              <option>Banco Guayaquil</option>
-              <option>Caja Chica</option>
+              <option value="">Todas las cuentas</option>
+
+              {cuentas.map((cuenta) => (
+                <option key={cuenta.id} value={cuenta.id}>
+                  {cuenta.nombre}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* METODO */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">
-              Método Pago
-            </label>
-
-            <select
-              className="
-                w-full
-                border
-                rounded-lg
-                px-4
-                py-2
-                focus:outline-none
-                focus:ring-2
-                focus:ring-[var(--color-primary)]
-              "
-            >
-              <option>Todos</option>
-              <option>Efectivo</option>
-              <option>Transferencia</option>
-              <option>Cheque</option>
-            </select>
-          </div>
-
-          {/* FECHA DESDE */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">
-              Fecha Desde
+            <label className="mb-2 block text-sm font-medium text-gray-600">
+              Fecha desde
             </label>
 
             <input
               type="date"
-              className="
-                w-full
-                border
-                rounded-lg
-                px-4
-                py-2
-                focus:outline-none
-                focus:ring-2
-                focus:ring-[var(--color-primary)]
-              "
+              value={fechaDesde}
+              onChange={(event) => setFechaDesde(event.target.value)}
+              className="w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
 
-          {/* FECHA HASTA */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">
-              Fecha Hasta
+            <label className="mb-2 block text-sm font-medium text-gray-600">
+              Fecha hasta
             </label>
 
             <input
               type="date"
-              className="
-                w-full
-                border
-                rounded-lg
-                px-4
-                py-2
-                focus:outline-none
-                focus:ring-2
-                focus:ring-[var(--color-primary)]
-              "
+              value={fechaHasta}
+              onChange={(event) => setFechaHasta(event.target.value)}
+              className="w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
         </div>
       </div>
 
-      {/* =========================
-          HISTORIAL
-      ========================= */}
-      <div className="bg-white rounded-xl shadow border overflow-hidden">
-        <div className="flex justify-between items-center p-6 border-b">
+      {/* HISTORIAL */}
+      <div className="overflow-hidden rounded-xl border bg-white shadow">
+        <div className="flex flex-col gap-3 border-b p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">
-              Historial de Ingresos
+              Historial de ingresos
             </h2>
 
-            <p className="text-sm text-gray-500 mt-1">
-              Listado de ingresos registrados en el sistema.
+            <p className="mt-1 text-sm text-gray-500">
+              Ingresos reales registrados en la tabla de transacciones.
             </p>
           </div>
 
-          <span
-            className="
-              px-3
-              py-1
-              rounded-full
-              bg-gray-100
-              text-sm
-              text-gray-700
-            "
-          >
-            {ingresos.length} registros
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
+            {ingresosFiltrados.length} registros
           </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Fecha
-                </th>
 
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Concepto
-                </th>
-
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Cuenta
-                </th>
-
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Método
-                </th>
-
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Referencia
-                </th>
-
-                <th className="px-4 py-3 text-right text-sm font-semibold">
-                  Valor
-                </th>
-
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Registrado por
-                </th>
-
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Estado
-                </th>
-
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {ingresos.length === 0 && (
+        {loading ? (
+          <div className="py-12 text-center text-gray-500">
+            Cargando ingresos...
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-[1050px] w-full">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={9} className="text-center py-10 text-gray-500">
-                    No existen ingresos registrados.
-                  </td>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                    Fecha
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                    Descripción
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                    Cuenta
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                    Origen
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                    Referencia
+                  </th>
+
+                  <th className="px-4 py-3 text-right text-sm font-semibold">
+                    Monto
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                    Registrado
+                  </th>
+
+                  <th className="px-4 py-3 text-center text-sm font-semibold">
+                    Acción
+                  </th>
                 </tr>
-              )}
+              </thead>
 
-              {ingresos.map((ingreso) => (
-                <tr
-                  key={ingreso.id}
-                  className="
-                    border-t
-                    hover:bg-gray-50
-                    transition
-                  "
-                >
-                  {/* FECHA */}
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    {ingreso.fecha}
-                  </td>
+              <tbody>
+                {ingresosFiltrados.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-10 text-center text-gray-500">
+                      No existen ingresos registrados.
+                    </td>
+                  </tr>
+                )}
 
-                  {/* CONCEPTO */}
-                  <td className="px-4 py-4">
-                    <div>
+                {ingresosFiltrados.map((ingreso) => (
+                  <tr
+                    key={ingreso.id}
+                    className="border-t transition hover:bg-gray-50"
+                  >
+                    <td className="whitespace-nowrap px-4 py-4">
+                      {formatDate(ingreso.fecha)}
+                    </td>
+
+                    <td className="px-4 py-4">
                       <p className="font-medium text-gray-800">
-                        {ingreso.concepto}
+                        {ingreso.descripcion ?? "Ingreso sin descripción"}
                       </p>
 
-                      <p className="text-xs text-gray-500">{ingreso.id}</p>
-                    </div>
-                  </td>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {ingreso.id.substring(0, 8)}
+                      </p>
+                    </td>
 
-                  {/* CUENTA */}
-                  <td className="px-4 py-4">{ingreso.cuenta}</td>
+                    <td className="px-4 py-4">
+                      <p className="font-medium">
+                        {ingreso.cuenta_nombre ?? "—"}
+                      </p>
 
-                  {/* METODO */}
-                  <td className="px-4 py-4">{ingreso.metodo_pago}</td>
+                      {ingreso.cuenta_tipo && (
+                        <p className="text-xs capitalize text-gray-500">
+                          {ingreso.cuenta_tipo}
+                        </p>
+                      )}
+                    </td>
 
-                  {/* REFERENCIA */}
-                  <td className="px-4 py-4">{ingreso.referencia}</td>
+                    <td className="px-4 py-4 capitalize">
+                      {ingreso.origen_modulo ?? "manual"}
+                    </td>
 
-                  {/* VALOR */}
-                  <td
-                    className="
-                      px-4
-                      py-4
-                      text-right
-                      font-bold
-                      text-green-600
-                    "
-                  >
-                    ${ingreso.valor.toLocaleString()}
-                  </td>
+                    <td className="px-4 py-4">
+                      {ingreso.referencia_id
+                        ? ingreso.referencia_id.substring(0, 8)
+                        : "—"}
+                    </td>
 
-                  {/* USUARIO */}
-                  <td className="px-4 py-4">{ingreso.usuario}</td>
+                    <td className="px-4 py-4 text-right font-bold text-green-600">
+                      {formatMoney(ingreso.monto)}
+                    </td>
 
-                  {/* ESTADO */}
-                  <td className="px-4 py-4 text-center">
-                    <span
-                      className={`
-                        px-3
-                        py-1
-                        rounded-full
-                        text-xs
-                        font-medium
-                        ${
-                          ingreso.estado === "Confirmado"
-                            ? "bg-green-100 text-green-700"
-                            : ingreso.estado === "Pendiente"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-red-100 text-red-700"
-                        }
-                      `}
-                    >
-                      {ingreso.estado}
-                    </span>
-                  </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-600">
+                      {formatDateTime(ingreso.fecha_creacion)}
+                    </td>
 
-                  {/* ACCIONES */}
-                  <td className="px-4 py-4">
-                    <div className="flex justify-center items-center gap-4">
-                      {/* VER */}
-                      <button
-                        title="Ver detalle"
-                        onClick={() => handleView(ingreso.id)}
-                        className="
-                          text-cyan-600
-                          hover:scale-110
-                          transition
-                        "
-                      >
-                        <FaEye />
-                      </button>
+                    <td className="px-4 py-4">
+                      <div className="flex justify-center">
+                        <button
+                          title="Ver detalle"
+                          onClick={() => handleView(ingreso)}
+                          className="text-cyan-600 transition hover:scale-110"
+                        >
+                          <FaEye />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-                      {/* EDITAR */}
-                      <button
-                        title="Editar"
-                        onClick={() => handleEdit(ingreso.id)}
-                        className="
-                          text-blue-600
-                          hover:scale-110
-                          transition
-                        "
-                      >
-                        <FaEdit />
-                      </button>
-
-                      {/* ELIMINAR */}
-                      <button
-                        title="Eliminar"
-                        onClick={() => handleDelete(ingreso.id)}
-                        className="
-                          text-red-600
-                          hover:scale-110
-                          transition
-                        "
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {/* =========================
-            PAGINACIÓN
-        ========================= */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 px-6 py-4 border-t bg-gray-50">
+        <div className="flex flex-col gap-3 border-t bg-gray-50 px-6 py-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-gray-600">
-            Mostrando <strong>1</strong> a <strong>{ingresos.length}</strong>{" "}
-            registros.
+            Mostrando <strong>{ingresosFiltrados.length}</strong> registros.
           </p>
 
-          <div className="flex items-center gap-2">
-            <button
-              className="
-                px-3 py-2
-                border
-                rounded-lg
-                hover:bg-gray-100
-                transition
-              "
-            >
-              Anterior
-            </button>
-
-            <button
-              className="
-                px-4 py-2
-                rounded-lg
-                bg-[var(--color-primary)]
-                text-white
-              "
-            >
-              1
-            </button>
-
-            <button
-              className="
-                px-4 py-2
-                border
-                rounded-lg
-                hover:bg-gray-100
-                transition
-              "
-            >
-              2
-            </button>
-
-            <button
-              className="
-                px-4 py-2
-                border
-                rounded-lg
-                hover:bg-gray-100
-                transition
-              "
-            >
-              3
-            </button>
-
-            <button
-              className="
-                px-3 py-2
-                border
-                rounded-lg
-                hover:bg-gray-100
-                transition
-              "
-            >
-              Siguiente
-            </button>
-          </div>
+          <p className="text-sm text-gray-600">
+            Total mostrado:{" "}
+            <strong className="text-green-700">
+              {formatMoney(totalFiltrado)}
+            </strong>
+          </p>
         </div>
       </div>
 
-      {/* =========================
-          RESUMEN DEL LISTADO
-      ========================= */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow border p-5">
-          <p className="text-sm text-gray-500">Total Mostrado</p>
+      {/* RESUMEN DEL LISTADO */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <p className="text-sm text-gray-500">Total mostrado</p>
 
-          <h3 className="text-2xl font-bold mt-2">
-            $
-            {ingresos
-              .reduce((acc, item) => acc + item.valor, 0)
-              .toLocaleString()}
+          <h3 className="mt-2 text-2xl font-bold text-green-600">
+            {formatMoney(totalFiltrado)}
           </h3>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <p className="text-sm text-gray-500">Confirmados</p>
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <p className="text-sm text-gray-500">Registros mostrados</p>
 
-          <h3 className="text-2xl font-bold mt-2 text-green-600">
-            {ingresos.filter((i) => i.estado === "Confirmado").length}
+          <h3 className="mt-2 text-2xl font-bold">
+            {ingresosFiltrados.length}
           </h3>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <p className="text-sm text-gray-500">Pendientes</p>
+        <div className="rounded-xl border bg-white p-5 shadow">
+          <p className="text-sm text-gray-500">Cuentas utilizadas</p>
 
-          <h3 className="text-2xl font-bold mt-2 text-yellow-600">
-            {ingresos.filter((i) => i.estado === "Pendiente").length}
-          </h3>
-        </div>
-
-        <div className="bg-white rounded-xl shadow border p-5">
-          <p className="text-sm text-gray-500">Anulados</p>
-
-          <h3 className="text-2xl font-bold mt-2 text-red-600">
-            {ingresos.filter((i) => i.estado === "Anulado").length}
+          <h3 className="mt-2 text-2xl font-bold text-blue-600">
+            {
+              new Set(ingresosFiltrados.map((ingreso) => ingreso.cuenta_id))
+                .size
+            }
           </h3>
         </div>
       </div>
 
-      {/* =========================
-          ACCESOS RÁPIDOS
-      ========================= */}
-      <div className="bg-white rounded-xl shadow border p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">
-          Accesos Rápidos
-        </h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button
-            className="
-              p-5
-              rounded-xl
-              border
-              hover:border-green-500
-              hover:bg-green-50
-              transition
-            "
-          >
-            <div className="text-3xl mb-2">💰</div>
-
-            <p className="font-medium">Nuevo Ingreso</p>
-          </button>
-
-          <button
-            className="
-              p-5
-              rounded-xl
-              border
-              hover:border-red-500
-              hover:bg-red-50
-              transition
-            "
-          >
-            <div className="text-3xl mb-2">📄</div>
-
-            <p className="font-medium">Exportar PDF</p>
-          </button>
-
-          <button
-            className="
-              p-5
-              rounded-xl
-              border
-              hover:border-blue-500
-              hover:bg-blue-50
-              transition
-            "
-          >
-            <div className="text-3xl mb-2">🖨️</div>
-
-            <p className="font-medium">Imprimir</p>
-          </button>
-
-          <button
-            className="
-              p-5
-              rounded-xl
-              border
-              hover:border-purple-500
-              hover:bg-purple-50
-              transition
-            "
-          >
-            <div className="text-3xl mb-2">📊</div>
-
-            <p className="font-medium">Reporte Mensual</p>
-          </button>
-        </div>
-      </div>
+      {/* MODAL DE REGISTRO */}
+      <RegistrarIngresoModal
+        open={modalOpen}
+        cuenta={null}
+        cuentas={cuentas.filter((cuenta) => cuenta.activo)}
+        onClose={() => setModalOpen(false)}
+        onRegistered={cargarDatos}
+      />
     </div>
   );
 }

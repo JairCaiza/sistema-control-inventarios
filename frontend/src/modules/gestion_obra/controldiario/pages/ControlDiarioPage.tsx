@@ -1,443 +1,777 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
+  BarChart3,
+  Building2,
   CalendarDays,
   ClipboardList,
   CloudSun,
-  Users,
-  DollarSign,
-  FileDown,
-  Search,
   Eye,
   Plus,
-  BarChart3,
+  RefreshCw,
+  Search,
 } from "lucide-react";
 
-interface ControlDiario {
-  id: string;
+import { Link } from "react-router-dom";
+
+import Swal from "sweetalert2";
+
+import { getControlesDiarios } from "../../../gestion_obra/controldiario/services/controlDiarioService";
+
+import CreateControlDiarioModal from "../../../gestion_obra/controldiario/components/CreateControlDiarioModalg";
+
+/* =====================================================
+   TIPO PARA LA VISTA GENERAL
+===================================================== */
+
+interface ControlDiarioGeneral {
+  id?: string;
+
+  obra_id: string;
+
+  obra_codigo?: string | null;
+
+  obra_nombre?: string | null;
+
   fecha: string;
-  obra: string;
+
   actividad: string;
-  descripcion: string;
-  hora_inicio: string;
-  hora_fin: string;
-  avance: number;
-  clima: string;
-  operarios: number;
-  horas_totales: number;
-  gasto_total: number;
-  estado: "Registrado" | "Revisado" | "Pendiente";
+
+  descripcion?: string | null;
+
+  hora_inicio?: string | null;
+
+  hora_fin?: string | null;
+
+  avance?: number | null;
+
+  observaciones?: string | null;
+
+  clima?: string | null;
 }
 
+/* =====================================================
+   ERROR API
+===================================================== */
+
+const obtenerMensajeError = (error: unknown, fallback: string) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const axiosError = error as {
+      response?: {
+        data?: {
+          message?: string;
+          detail?: string;
+        };
+      };
+    };
+
+    return (
+      axiosError.response?.data?.detail ||
+      axiosError.response?.data?.message ||
+      fallback
+    );
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+/* =====================================================
+   FECHA LOCAL
+===================================================== */
+
+const obtenerFechaLocal = () => {
+  const fecha = new Date();
+
+  const year = fecha.getFullYear();
+
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
+
+  const day = String(fecha.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+/* =====================================================
+   FORMATEAR FECHA
+===================================================== */
+
+const formatDate = (value?: string | null) => {
+  if (!value) {
+    return "—";
+  }
+
+  const fecha = value.includes("T") ? value.split("T")[0] : value;
+
+  const partes = fecha.split("-");
+
+  if (partes.length !== 3) {
+    return fecha;
+  }
+
+  const [year, month, day] = partes;
+
+  return `${day}/${month}/${year}`;
+};
+
+/* =====================================================
+   FORMATEAR HORA
+===================================================== */
+
+const formatHora = (value?: string | null) => {
+  if (!value) {
+    return "—";
+  }
+
+  return value.slice(0, 5);
+};
+
+/* =====================================================
+   NOMBRE OBRA
+===================================================== */
+
+const obtenerNombreObra = (control: ControlDiarioGeneral) => {
+  if (control.obra_nombre) {
+    return control.obra_nombre;
+  }
+
+  if (control.obra_codigo) {
+    return control.obra_codigo;
+  }
+
+  return "Obra sin nombre";
+};
+
+/* =====================================================
+   COMPONENTE
+===================================================== */
+
 function ControlDiarioPage() {
+  /* =================================================
+     STATES
+  ================================================= */
+
+  const [controles, setControles] = useState<ControlDiarioGeneral[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
+  const [refreshing, setRefreshing] = useState(false);
+
   const [search, setSearch] = useState("");
-  const [filtroObra, setFiltroObra] = useState("Todas");
 
-  const controles: ControlDiario[] = [
-    {
-      id: "1",
-      fecha: "2026-06-22",
-      obra: "Construcción Bodega Norte",
-      actividad: "Fundición de columnas",
-      descripcion: "Se realizó fundición de columnas principales del bloque A.",
-      hora_inicio: "08:00",
-      hora_fin: "16:30",
-      avance: 65,
-      clima: "Soleado",
-      operarios: 8,
-      horas_totales: 68,
-      gasto_total: 420,
-      estado: "Registrado",
-    },
-    {
-      id: "2",
-      fecha: "2026-06-21",
-      obra: "Ampliación Local Comercial",
-      actividad: "Encofrado de losa",
-      descripcion: "Armado y revisión de encofrado para losa superior.",
-      hora_inicio: "07:30",
-      hora_fin: "15:00",
-      avance: 42,
-      clima: "Nublado",
-      operarios: 5,
-      horas_totales: 37.5,
-      gasto_total: 260,
-      estado: "Revisado",
-    },
-    {
-      id: "3",
-      fecha: "2026-06-20",
-      obra: "Mantenimiento Galpón",
-      actividad: "Limpieza y reparación",
-      descripcion: "Mantenimiento preventivo de estructura metálica.",
-      hora_inicio: "09:00",
-      hora_fin: "13:00",
-      avance: 25,
-      clima: "Lluvia ligera",
-      operarios: 3,
-      horas_totales: 12,
-      gasto_total: 90,
-      estado: "Pendiente",
-    },
-  ];
+  const [filtroObra, setFiltroObra] = useState("");
 
-  const obras = ["Todas", ...Array.from(new Set(controles.map((c) => c.obra)))];
+  const [filtroFecha, setFiltroFecha] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+
+  /* =================================================
+     CARGAR CONTROLES
+  ================================================= */
+
+  const loadControles = useCallback(async (mostrarLoader = true) => {
+    try {
+      if (mostrarLoader) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      const data = await getControlesDiarios();
+
+      const controlesGeneral = Array.isArray(data)
+        ? (data as ControlDiarioGeneral[])
+        : [];
+
+      setControles(controlesGeneral);
+    } catch (error) {
+      console.error("Error cargando controles diarios:", error);
+
+      await Swal.fire({
+        icon: "error",
+
+        title: "No se pudieron cargar los controles",
+
+        text: obtenerMensajeError(
+          error,
+          "Ocurrió un error al consultar los controles diarios.",
+        ),
+
+        confirmButtonText: "Aceptar",
+      });
+    } finally {
+      setLoading(false);
+
+      setRefreshing(false);
+    }
+  }, []);
+
+  /* =================================================
+     CARGAR AL ENTRAR
+  ================================================= */
+
+  useEffect(() => {
+    void loadControles();
+  }, [loadControles]);
+
+  /* =================================================
+     OBRAS DEL SELECT
+  ================================================= */
+
+  const obras = useMemo(() => {
+    const mapa = new Map<string, string>();
+
+    controles.forEach((control) => {
+      if (!control.obra_id) {
+        return;
+      }
+
+      mapa.set(control.obra_id, obtenerNombreObra(control));
+    });
+
+    return Array.from(mapa.entries())
+      .map(([id, nombre]) => ({
+        id,
+        nombre,
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [controles]);
+
+  /* =================================================
+     FILTROS
+  ================================================= */
 
   const controlesFiltrados = useMemo(() => {
+    const texto = search.trim().toLowerCase();
+
     return controles.filter((control) => {
-      const matchSearch =
-        control.obra.toLowerCase().includes(search.toLowerCase()) ||
-        control.actividad.toLowerCase().includes(search.toLowerCase()) ||
-        control.descripcion.toLowerCase().includes(search.toLowerCase());
+      const obraNombre = (control.obra_nombre ?? "").toLowerCase();
 
-      const matchObra = filtroObra === "Todas" || control.obra === filtroObra;
+      const obraCodigo = (control.obra_codigo ?? "").toLowerCase();
 
-      return matchSearch && matchObra;
+      const actividad = (control.actividad ?? "").toLowerCase();
+
+      const descripcion = (control.descripcion ?? "").toLowerCase();
+
+      const observaciones = (control.observaciones ?? "").toLowerCase();
+
+      const coincideBusqueda =
+        !texto ||
+        obraNombre.includes(texto) ||
+        obraCodigo.includes(texto) ||
+        actividad.includes(texto) ||
+        descripcion.includes(texto) ||
+        observaciones.includes(texto);
+
+      const coincideObra = !filtroObra || control.obra_id === filtroObra;
+
+      const fechaControl = control.fecha ? control.fecha.split("T")[0] : "";
+
+      const coincideFecha = !filtroFecha || fechaControl === filtroFecha;
+
+      return coincideBusqueda && coincideObra && coincideFecha;
     });
-  }, [search, filtroObra]);
+  }, [controles, search, filtroObra, filtroFecha]);
+
+  /* =================================================
+     KPIS
+  ================================================= */
 
   const resumen = useMemo(() => {
     const totalControles = controlesFiltrados.length;
 
+    const obrasConActividad = new Set(
+      controlesFiltrados.map((control) => control.obra_id).filter(Boolean),
+    ).size;
+
+    const avances = controlesFiltrados
+      .map((control) => control.avance)
+      .filter(
+        (avance): avance is number =>
+          typeof avance === "number" && Number.isFinite(avance),
+      );
+
     const avancePromedio =
-      totalControles > 0
-        ? controlesFiltrados.reduce((acc, c) => acc + c.avance, 0) /
-          totalControles
-        : 0;
+      avances.length > 0
+        ? avances.reduce((total, avance) => total + avance, 0) / avances.length
+        : null;
 
-    const totalOperarios = controlesFiltrados.reduce(
-      (acc, c) => acc + c.operarios,
-      0,
-    );
+    const hoy = obtenerFechaLocal();
 
-    const gastoTotal = controlesFiltrados.reduce(
-      (acc, c) => acc + c.gasto_total,
-      0,
-    );
+    const controlesHoy = controlesFiltrados.filter((control) => {
+      const fechaControl = control.fecha ? control.fecha.split("T")[0] : "";
+
+      return fechaControl === hoy;
+    }).length;
 
     return {
       totalControles,
+      obrasConActividad,
       avancePromedio,
-      totalOperarios,
-      gastoTotal,
+      controlesHoy,
     };
   }, [controlesFiltrados]);
 
-  const getEstadoClass = (estado: ControlDiario["estado"]) => {
-    if (estado === "Registrado") return "bg-blue-100 text-blue-700";
-    if (estado === "Revisado") return "bg-green-100 text-green-700";
-    return "bg-yellow-100 text-yellow-700";
+  /* =================================================
+     LIMPIAR FILTROS
+  ================================================= */
+
+  const limpiarFiltros = () => {
+    setSearch("");
+    setFiltroObra("");
+    setFiltroFecha("");
   };
+
+  /* =================================================
+     LOADING
+  ================================================= */
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-slate-500">
+        <RefreshCw size={30} className="animate-spin" />
+
+        <p className="text-sm">Cargando controles diarios...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Control Diario</h1>
-          <p className="text-gray-500 mt-1">
-            Seguimiento diario de actividades, avances, operarios y gastos por
-            obra.
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Gestión de obras
+          </p>
+
+          <h1 className="mt-1 text-3xl font-bold text-slate-900">
+            Control Diario
+          </h1>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Consulta general de actividades, horarios, avances y novedades
+            registradas en todas las obras.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition">
-            <FileDown size={18} />
-            Exportar PDF
+          <button
+            type="button"
+            disabled={refreshing}
+            onClick={() => void loadControles(false)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
+            Actualizar
           </button>
 
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition">
-            <Plus size={18} />
-            Nuevo Control
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            <Plus size={17} />
+            Nuevo control
           </button>
         </div>
       </div>
 
-      {/* KPIS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+      {/* =================================================
+          KPIS
+      ================================================= */}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* CONTROLES */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Controles registrados</p>
-              <h2 className="text-3xl font-bold mt-2">
+              <p className="text-sm text-slate-500">Controles registrados</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
                 {resumen.totalControles}
-              </h2>
+              </p>
             </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <ClipboardList className="text-blue-600" />
+
+            <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+              <ClipboardList size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        {/* OBRAS */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Avance promedio</p>
-              <h2 className="text-3xl font-bold mt-2">
-                {resumen.avancePromedio.toFixed(1)}%
-              </h2>
+              <p className="text-sm text-slate-500">Obras con actividad</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {resumen.obrasConActividad}
+              </p>
             </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <BarChart3 className="text-green-600" />
+
+            <div className="rounded-xl bg-violet-50 p-3 text-violet-600">
+              <Building2 size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        {/* AVANCE */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Operarios registrados</p>
-              <h2 className="text-3xl font-bold mt-2">
-                {resumen.totalOperarios}
-              </h2>
+              <p className="text-sm text-slate-500">Avance promedio</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {resumen.avancePromedio !== null
+                  ? `${resumen.avancePromedio.toFixed(1)}%`
+                  : "—"}
+              </p>
             </div>
-            <div className="bg-purple-100 p-3 rounded-full">
-              <Users className="text-purple-600" />
+
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+              <BarChart3 size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        {/* HOY */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Gastos vinculados</p>
-              <h2 className="text-3xl font-bold mt-2">
-                ${resumen.gastoTotal.toLocaleString()}
-              </h2>
+              <p className="text-sm text-slate-500">Controles de hoy</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {resumen.controlesHoy}
+              </p>
             </div>
-            <div className="bg-red-100 p-3 rounded-full">
-              <DollarSign className="text-red-600" />
+
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-600">
+              <CalendarDays size={22} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div className="bg-white rounded-xl shadow border p-5">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="relative lg:col-span-2">
-            <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+      {/* =================================================
+          FILTROS
+      ================================================= */}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr_1fr_auto]">
+          {/* BUSCADOR */}
+
+          <div className="relative">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
             <input
               type="text"
-              placeholder="Buscar por obra, actividad o descripción..."
-              className="w-full border rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por obra, actividad, descripción u observación..."
+              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-[var(--color-primary)]"
             />
           </div>
 
+          {/* SELECT OBRA */}
+
           <select
-            className="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             value={filtroObra}
-            onChange={(e) => setFiltroObra(e.target.value)}
+            onChange={(event) => setFiltroObra(event.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--color-primary)]"
           >
+            <option value="">Todas las obras</option>
+
             {obras.map((obra) => (
-              <option key={obra} value={obra}>
-                {obra}
+              <option key={obra.id} value={obra.id}>
+                {obra.nombre}
               </option>
             ))}
           </select>
+
+          {/* FECHA */}
+
+          <input
+            type="date"
+            value={filtroFecha}
+            onChange={(event) => setFiltroFecha(event.target.value)}
+            className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[var(--color-primary)]"
+          />
+
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Limpiar
+          </button>
         </div>
       </div>
 
-      {/* TABLA */}
-      <div className="bg-white rounded-xl shadow border overflow-hidden">
-        <div className="p-5 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
+      {/* =================================================
+          TABLA
+      ================================================= */}
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-bold text-slate-900">
             Registros diarios
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Información tomada desde controles diarios, operarios y gastos de
-            obra.
+
+          <p className="mt-1 text-sm text-slate-500">
+            Información tomada directamente de los controles diarios registrados
+            en cada obra.
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Fecha
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Obra
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">
-                  Actividad
-                </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Horario
-                </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Avance
-                </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Operarios
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">
-                  Gasto
-                </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
+        {controlesFiltrados.length === 0 ? (
+          <div className="flex min-h-[260px] flex-col items-center justify-center px-6 text-center">
+            <ClipboardList size={38} className="text-slate-300" />
 
-            <tbody>
-              {controlesFiltrados.length === 0 && (
+            <p className="mt-3 font-semibold text-slate-700">
+              No hay controles para mostrar
+            </p>
+
+            <p className="mt-1 text-sm text-slate-400">
+              Registra un nuevo control o modifica los filtros.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              <Plus size={16} />
+              Nuevo control
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50">
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-gray-500">
-                    No hay controles diarios registrados
-                  </td>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                    Fecha
+                  </th>
+
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                    Obra
+                  </th>
+
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                    Actividad
+                  </th>
+
+                  <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                    Horario
+                  </th>
+
+                  <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                    Avance
+                  </th>
+
+                  <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                    Clima
+                  </th>
+
+                  <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                    Acción
+                  </th>
                 </tr>
-              )}
+              </thead>
 
-              {controlesFiltrados.map((control) => (
-                <tr
-                  key={control.id}
-                  className="border-t hover:bg-gray-50 transition"
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarDays size={16} className="text-gray-400" />
-                      {control.fecha}
-                    </div>
-                  </td>
+              <tbody className="divide-y divide-slate-100">
+                {controlesFiltrados.map((control, index) => (
+                  <tr
+                    key={
+                      control.id ??
+                      `${control.obra_id}-${control.fecha}-${index}`
+                    }
+                    className="transition hover:bg-slate-50"
+                  >
+                    {/* FECHA */}
 
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-800">{control.obra}</p>
-                    <p className="text-xs text-gray-500">
-                      Control #{control.id}
-                    </p>
-                  </td>
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <CalendarDays size={15} className="text-slate-400" />
 
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{control.actividad}</p>
-                    <p className="text-sm text-gray-500 line-clamp-1">
-                      {control.descripcion}
-                    </p>
-                    <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
-                      <CloudSun size={14} />
-                      {control.clima}
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-3 text-center text-sm">
-                    {control.hora_inicio} - {control.hora_fin}
-                    <p className="text-xs text-gray-500">
-                      {control.horas_totales} h
-                    </p>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col items-center">
-                      <span className="text-sm font-semibold">
-                        {control.avance}%
-                      </span>
-                      <div className="w-24 bg-gray-200 rounded-full h-2 mt-1">
-                        <div
-                          className="bg-[var(--color-primary)] h-2 rounded-full"
-                          style={{ width: `${control.avance}%` }}
-                        />
+                        {formatDate(control.fecha)}
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-semibold">{control.operarios}</span>
-                  </td>
+                    {/* OBRA */}
 
-                  <td className="px-4 py-3 text-right font-semibold text-red-600">
-                    ${control.gasto_total.toLocaleString()}
-                  </td>
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-slate-800">
+                        {obtenerNombreObra(control)}
+                      </p>
 
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoClass(
-                        control.estado,
-                      )}`}
-                    >
-                      {control.estado}
-                    </span>
-                  </td>
+                      {control.obra_codigo && (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {control.obra_codigo}
+                        </p>
+                      )}
+                    </td>
 
-                  <td className="px-4 py-3">
-                    <div className="flex justify-center">
-                      <button
-                        className="text-cyan-600 hover:scale-110 transition"
-                        title="Ver detalle"
+                    {/* ACTIVIDAD */}
+
+                    <td className="max-w-[350px] px-5 py-4">
+                      <p className="font-semibold text-slate-800">
+                        {control.actividad}
+                      </p>
+
+                      {control.descripcion && (
+                        <p className="mt-1 line-clamp-2 text-sm text-slate-500">
+                          {control.descripcion}
+                        </p>
+                      )}
+
+                      {control.observaciones && (
+                        <p className="mt-1 line-clamp-1 text-xs text-slate-400">
+                          Obs: {control.observaciones}
+                        </p>
+                      )}
+                    </td>
+
+                    {/* HORARIO */}
+
+                    <td className="whitespace-nowrap px-5 py-4 text-center text-sm text-slate-600">
+                      {control.hora_inicio || control.hora_fin ? (
+                        <>
+                          {formatHora(control.hora_inicio)}
+
+                          {" - "}
+
+                          {formatHora(control.hora_fin)}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* AVANCE */}
+
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col items-center">
+                        {control.avance !== null &&
+                        control.avance !== undefined ? (
+                          <>
+                            <span className="text-sm font-semibold text-slate-700">
+                              {control.avance}%
+                            </span>
+
+                            <div className="mt-1 h-2 w-20 overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full rounded-full bg-[var(--color-primary)]"
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    Math.max(0, Number(control.avance)),
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-sm text-slate-400">—</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* CLIMA */}
+
+                    <td className="px-5 py-4 text-center">
+                      {control.clima ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+                          <CloudSun size={14} />
+
+                          {control.clima}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-slate-400">—</span>
+                      )}
+                    </td>
+
+                    {/* ACCIÓN */}
+
+                    <td className="px-5 py-4 text-center">
+                      <Link
+                        to={`/dashboard/obras/${control.obra_id}`}
+                        title="Ver obra"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-cyan-600 transition hover:bg-cyan-50"
                       >
-                        <Eye size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <Eye size={17} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* FOOTER */}
+
+        <div className="border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <p className="text-xs text-slate-500">
+            Mostrando <strong>{controlesFiltrados.length}</strong> de{" "}
+            <strong>{controles.length}</strong> control(es).
+          </p>
         </div>
       </div>
 
-      {/* RESUMEN INFERIOR */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow border p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Observaciones importantes
-          </h2>
+      {/* =================================================
+          INFORMACIÓN
+      ================================================= */}
 
-          <div className="space-y-3">
-            <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
-              <p className="font-semibold text-yellow-800">
-                Controles pendientes de revisión
-              </p>
-              <p className="text-sm text-yellow-700">
-                Revisa los registros pendientes antes de generar reportes.
-              </p>
-            </div>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+          <p className="font-semibold text-blue-900">Control Diario general</p>
 
-            <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
-              <p className="font-semibold text-blue-800">
-                Gastos vinculados a obra
-              </p>
-              <p className="text-sm text-blue-700">
-                Los gastos diarios deben alimentar automáticamente el módulo
-                financiero.
-              </p>
-            </div>
-          </div>
+          <p className="mt-1 text-sm leading-6 text-blue-800">
+            Consulta los controles de todas las obras y registra nuevas
+            actividades seleccionando la obra correspondiente.
+          </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Acciones rápidas
-          </h2>
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
+          <p className="font-semibold text-violet-900">
+            Control desde una obra
+          </p>
 
-          <div className="grid grid-cols-2 gap-4">
-            <button className="p-4 rounded-xl border hover:border-[var(--color-primary)] hover:bg-gray-50 transition">
-              <div className="text-2xl mb-2">📝</div>
-              <p className="font-semibold">Nuevo control</p>
-            </button>
-
-            <button className="p-4 rounded-xl border hover:border-green-500 hover:bg-green-50 transition">
-              <div className="text-2xl mb-2">👷</div>
-              <p className="font-semibold">Operarios</p>
-            </button>
-
-            <button className="p-4 rounded-xl border hover:border-red-500 hover:bg-red-50 transition">
-              <div className="text-2xl mb-2">💸</div>
-              <p className="font-semibold">Gastos obra</p>
-            </button>
-
-            <button className="p-4 rounded-xl border hover:border-blue-500 hover:bg-blue-50 transition">
-              <div className="text-2xl mb-2">📊</div>
-              <p className="font-semibold">Reporte</p>
-            </button>
-          </div>
+          <p className="mt-1 text-sm leading-6 text-violet-800">
+            Desde el detalle de la obra se utiliza el mismo formulario, pero la
+            obra ya está seleccionada.
+          </p>
         </div>
       </div>
+
+      {/* =================================================
+          MODAL
+      ================================================= */}
+
+      <CreateControlDiarioModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={async () => {
+          setModalOpen(false);
+
+          await loadControles(false);
+        }}
+      />
     </div>
   );
 }

@@ -166,7 +166,7 @@ function CreateContratoModal({ open, onClose, onCreated }: Props) {
         fecha_inicio: "",
         fecha_fin: "",
         observaciones: "",
-        estado: "ACTIVO",
+        estado: "activo",
       });
 
       onCreated();

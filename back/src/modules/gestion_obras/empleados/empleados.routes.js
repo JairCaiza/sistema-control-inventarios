@@ -1,37 +1,126 @@
-const express = require("express");
-const router = express.Router();
+const express =
+   require("express");
 
-const empleadosController = require("./empleados.controller");
+const router =
+   express.Router();
 
-const protect = require("../../../middlewares/auth.middleware");
-const authorizeRoles = require("../../../middlewares/role.middleware");
+const empleadosController =
+   require("./empleados.controller");
 
-/* =========================
-   MIDDLEWARES
-========================= */
-router.use(protect);
-router.use(authorizeRoles("Administrador"));
+const protect =
+   require(
+      "../../../middlewares/auth.middleware"
+   );
 
-/* =========================
-   RUTAS
-========================= */
+const authorizeRoles =
+   require(
+      "../../../middlewares/role.middleware"
+   );
 
-/* CREAR EMPLEADO */
-router.post("/", empleadosController.createEmpleado);
+/* =====================================================
+   AUTENTICACIÓN
+===================================================== */
 
-/* LISTAR EMPLEADOS */
-router.get("/", empleadosController.getEmpleados);
+router.use(
+   protect
+);
 
-/* OBTENER EMPLEADO POR ID */
-router.get("/:id", empleadosController.getEmpleadoById);
+/*
+ * Conservamos el mismo permiso que ya tenías
+ * para no alterar la seguridad actual del módulo.
+ */
+router.use(
+   authorizeRoles(
+      "Administrador"
+   )
+);
 
-/* ACTUALIZAR EMPLEADO */
-router.put("/:id", empleadosController.updateEmpleado);
+/* =====================================================
+   CREAR EMPLEADO
+===================================================== */
 
-/* ACTIVAR / DESACTIVAR */
-router.put("/:id/status", empleadosController.toggleEmpleadoStatus);
+router.post(
+   "/",
+   empleadosController.createEmpleado
+);
 
-/* ELIMINAR EMPLEADO */
-router.delete("/:id", empleadosController.deleteEmpleado);
+/* =====================================================
+   LISTAR EMPLEADOS
+===================================================== */
 
-module.exports = router;
+router.get(
+   "/",
+   empleadosController.getEmpleados
+);
+
+/* =====================================================
+   CONSULTAS DEL DETALLE DEL EMPLEADO
+===================================================== */
+
+/*
+ * Estas rutas alimentarán las pestañas:
+ *
+ * Información
+ * Obras
+ * Pagos
+ * Actividad
+ */
+
+router.get(
+   "/:id/resumen",
+   empleadosController.getEmpleadoResumen
+);
+
+router.get(
+   "/:id/obras",
+   empleadosController.getEmpleadoObras
+);
+
+router.get(
+   "/:id/pagos",
+   empleadosController.getEmpleadoPagos
+);
+
+router.get(
+   "/:id/actividad",
+   empleadosController.getEmpleadoActividad
+);
+
+/* =====================================================
+   OBTENER EMPLEADO
+===================================================== */
+
+router.get(
+   "/:id",
+   empleadosController.getEmpleadoById
+);
+
+/* =====================================================
+   ACTUALIZAR EMPLEADO
+===================================================== */
+
+router.put(
+   "/:id",
+   empleadosController.updateEmpleado
+);
+
+/* =====================================================
+   ACTIVAR / DESACTIVAR
+===================================================== */
+
+router.put(
+   "/:id/status",
+   empleadosController.toggleEmpleadoStatus
+);
+
+/* =====================================================
+   ELIMINAR EMPLEADO
+===================================================== */
+
+router.delete(
+   "/:id",
+   empleadosController.deleteEmpleado
+);
+
+module.exports =
+   router;

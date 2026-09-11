@@ -1,87 +1,287 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { Link } from "react-router-dom";
 
 import Swal from "sweetalert2";
 
-import type { Obra } from "../services/obrasService";
-import { getObras, deleteObra } from "../services/obrasService";
-
-import CreateObraModal from "../components/modals/CreateObraModal";
-import EditObraModal from "../components/modals/EditObraModal";
-
 import {
-  Plus,
-  Search,
-  FileDown,
-  RefreshCw,
   Building2,
-  MapPin,
   CalendarDays,
-  DollarSign,
-  Eye,
-  Edit,
-  Trash2,
-  ClipboardList,
-  PauseCircle,
   CheckCircle,
+  ClipboardList,
+  DollarSign,
+  Edit,
+  Eye,
+  MapPin,
+  PauseCircle,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
   XCircle,
   Clock,
 } from "lucide-react";
 
+import {
+  deleteObra,
+  getObras,
+  type EstadoObra,
+  type Obra,
+} from "../services/obrasService";
+
+import CreateObraModal from "../components/modals/CreateObraModal";
+
+import EditObraModal from "../components/modals/EditObraModal";
+
+/* =====================================================
+   TIPOS
+===================================================== */
+
+type EstadoFiltro = "todos" | EstadoObra;
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+const obtenerMensajeError = (error: unknown, fallback: string) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const axiosError = error as {
+      response?: {
+        data?: {
+          message?: string;
+        };
+      };
+    };
+
+    return axiosError.response?.data?.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+/* =====================================================
+   FORMATEAR MONEDA
+===================================================== */
+
+const formatCurrency = (value: number | string | null | undefined) => {
+  const numero = Number(value ?? 0);
+
+  return new Intl.NumberFormat("es-EC", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(numero) ? numero : 0);
+};
+
+/* =====================================================
+   FORMATEAR FECHA
+===================================================== */
+
+const formatDate = (date?: string | null) => {
+  if (!date) {
+    return "No registrada";
+  }
+
+  const soloFecha = date.includes("T") ? date.split("T")[0] : date;
+
+  const partes = soloFecha.split("-");
+
+  if (partes.length !== 3) {
+    return soloFecha;
+  }
+
+  const [year, month, day] = partes;
+
+  return `${day}/${month}/${year}`;
+};
+
+/* =====================================================
+   LABEL ESTADO
+===================================================== */
+
+const getEstadoLabel = (estado: EstadoObra) => {
+  const labels: Record<EstadoObra, string> = {
+    planificada: "Planificada",
+
+    en_proceso: "En proceso",
+
+    pausada: "Pausada",
+
+    finalizada: "Finalizada",
+
+    cancelada: "Cancelada",
+  };
+
+  return labels[estado];
+};
+
+/* =====================================================
+   ESTILO ESTADO
+===================================================== */
+
+const getEstadoClass = (estado: EstadoObra) => {
+  const clases: Record<EstadoObra, string> = {
+    planificada: "border-slate-200 bg-slate-100 text-slate-700",
+
+    en_proceso: "border-blue-200 bg-blue-50 text-blue-700",
+
+    pausada: "border-amber-200 bg-amber-50 text-amber-700",
+
+    finalizada: "border-emerald-200 bg-emerald-50 text-emerald-700",
+
+    cancelada: "border-rose-200 bg-rose-50 text-rose-700",
+  };
+
+  return clases[estado];
+};
+
+/* =====================================================
+   ICONO ESTADO
+===================================================== */
+
+const getEstadoIcon = (estado: EstadoObra) => {
+  switch (estado) {
+    case "planificada":
+      return <Clock size={14} />;
+
+    case "en_proceso":
+      return <Building2 size={14} />;
+
+    case "pausada":
+      return <PauseCircle size={14} />;
+
+    case "finalizada":
+      return <CheckCircle size={14} />;
+
+    case "cancelada":
+      return <XCircle size={14} />;
+
+    default:
+      return <ClipboardList size={14} />;
+  }
+};
+
+/* =====================================================
+   COMPONENTE
+===================================================== */
+
 function ObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
+
   const [loading, setLoading] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState("todos");
+
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>("todos");
 
   const [modalOpen, setModalOpen] = useState(false);
+
   const [editOpen, setEditOpen] = useState(false);
+
   const [selectedObra, setSelectedObra] = useState<Obra | null>(null);
 
-  const loadObras = async () => {
+  /* =================================================
+     CARGAR OBRAS
+  ================================================= */
+
+  const loadObras = useCallback(async () => {
     try {
       setLoading(true);
+
       const data = await getObras();
-      setObras(data);
+
+      setObras(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error(error);
-      Swal.fire("Error", "No se pudieron cargar las obras", "error");
+      console.error("Error cargando obras:", error);
+
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudieron cargar las obras",
+        text: obtenerMensajeError(
+          error,
+          "Ocurrió un error al consultar las obras.",
+        ),
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadObras();
   }, []);
 
-  const filtered = useMemo(() => {
-    return obras.filter((obra) => {
-      const matchSearch =
-        obra.codigo?.toLowerCase().includes(search.toLowerCase()) ||
-        obra.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-        obra.ubicacion?.toLowerCase().includes(search.toLowerCase()) ||
-        obra.estado?.toLowerCase().includes(search.toLowerCase());
+  useEffect(() => {
+    void loadObras();
+  }, [loadObras]);
 
+  /* =================================================
+     FILTROS
+  ================================================= */
+
+  const filtered = useMemo(() => {
+    const termino = search.trim().toLowerCase();
+
+    return obras.filter((obra) => {
       const matchEstado =
         estadoFiltro === "todos" || obra.estado === estadoFiltro;
 
-      return matchSearch && matchEstado;
+      if (!matchEstado) {
+        return false;
+      }
+
+      if (!termino) {
+        return true;
+      }
+
+      const textoBusqueda = [
+        obra.codigo,
+        obra.nombre,
+        obra.cliente_nombre,
+        obra.ubicacion,
+        getEstadoLabel(obra.estado),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return textoBusqueda.includes(termino);
     });
   }, [obras, search, estadoFiltro]);
 
+  /* =================================================
+     RESUMEN
+  ================================================= */
+
   const resumen = useMemo(() => {
     const total = obras.length;
-    const planificadas = obras.filter((o) => o.estado === "planificada").length;
-    const enProceso = obras.filter((o) => o.estado === "en_proceso").length;
-    const pausadas = obras.filter((o) => o.estado === "pausada").length;
-    const finalizadas = obras.filter((o) => o.estado === "finalizada").length;
 
-    const presupuestoTotal = obras.reduce(
-      (acc, o) => acc + Number(o.presupuesto || 0),
-      0,
-    );
+    const planificadas = obras.filter(
+      (obra) => obra.estado === "planificada",
+    ).length;
+
+    const enProceso = obras.filter(
+      (obra) => obra.estado === "en_proceso",
+    ).length;
+
+    const pausadas = obras.filter((obra) => obra.estado === "pausada").length;
+
+    const finalizadas = obras.filter(
+      (obra) => obra.estado === "finalizada",
+    ).length;
+
+    const canceladas = obras.filter(
+      (obra) => obra.estado === "cancelada",
+    ).length;
+
+    const presupuestoTotal = obras.reduce((totalPresupuesto, obra) => {
+      const presupuesto = Number(obra.presupuesto ?? 0);
+
+      return (
+        totalPresupuesto + (Number.isFinite(presupuesto) ? presupuesto : 0)
+      );
+    }, 0);
 
     return {
       total,
@@ -89,319 +289,552 @@ function ObrasPage() {
       enProceso,
       pausadas,
       finalizadas,
+      canceladas,
       presupuestoTotal,
     };
   }, [obras]);
 
-  const getEstadoClass = (estado?: string) => {
-    if (estado === "planificada") return "bg-gray-100 text-gray-700";
-    if (estado === "en_proceso") return "bg-blue-100 text-blue-700";
-    if (estado === "pausada") return "bg-yellow-100 text-yellow-700";
-    if (estado === "finalizada") return "bg-green-100 text-green-700";
-    if (estado === "cancelada") return "bg-red-100 text-red-700";
-    return "bg-gray-100 text-gray-700";
+  /* =================================================
+     ABRIR EDITAR
+  ================================================= */
+
+  const handleOpenEdit = (obra: Obra) => {
+    setSelectedObra(obra);
+
+    setEditOpen(true);
   };
 
-  const getEstadoIcon = (estado?: string) => {
-    if (estado === "planificada") return <Clock size={15} />;
-    if (estado === "en_proceso") return <Building2 size={15} />;
-    if (estado === "pausada") return <PauseCircle size={15} />;
-    if (estado === "finalizada") return <CheckCircle size={15} />;
-    if (estado === "cancelada") return <XCircle size={15} />;
-    return <ClipboardList size={15} />;
+  /* =================================================
+     CERRAR EDITAR
+  ================================================= */
+
+  const handleCloseEdit = () => {
+    setEditOpen(false);
+
+    setSelectedObra(null);
   };
 
-  const formatDate = (date?: string | null) => {
-    if (!date) return "No registrada";
-    return date.split("T")[0];
-  };
+  /* =================================================
+     ELIMINAR
+  ================================================= */
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (obra: Obra) => {
     const result = await Swal.fire({
-      title: "¿Eliminar obra?",
-      text: "Esta acción no se puede deshacer",
       icon: "warning",
+
+      title: "¿Eliminar obra?",
+
+      html: `
+            <div style="text-align:left">
+              <p style="margin-bottom:8px">
+                Está por eliminar:
+              </p>
+
+              <strong>
+                ${obra.codigo} - ${obra.nombre}
+              </strong>
+
+              <p style="margin-top:12px">
+                La eliminación solamente será permitida si la obra
+                todavía no posee empleados, controles diarios,
+                gastos, pagos o movimientos financieros asociados.
+              </p>
+            </div>
+          `,
+
       showCancelButton: true,
+
       confirmButtonText: "Sí, eliminar",
+
       cancelButtonText: "Cancelar",
+
+      confirmButtonColor: "#dc2626",
+
+      reverseButtons: true,
     });
 
-    if (result.isConfirmed) {
-      try {
-        await deleteObra(id);
-        setObras((prev) => prev.filter((o) => o.id !== id));
+    if (!result.isConfirmed) {
+      return;
+    }
 
-        Swal.fire({
-          icon: "success",
-          title: "Obra eliminada",
-          timer: 1400,
-          showConfirmButton: false,
-        });
-      } catch (error: any) {
-        Swal.fire(
-          "Error",
-          error.response?.data?.message || "No se pudo eliminar",
-          "error",
-        );
-      }
+    try {
+      await deleteObra(obra.id);
+
+      setObras((prev) => prev.filter((item) => item.id !== obra.id));
+
+      await Swal.fire({
+        icon: "success",
+
+        title: "Obra eliminada",
+
+        text: "La obra fue eliminada correctamente.",
+
+        timer: 1500,
+
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error eliminando obra:", error);
+
+      const mensaje = obtenerMensajeError(
+        error,
+        "No se pudo eliminar la obra.",
+      );
+
+      await Swal.fire({
+        icon: "error",
+
+        title: "No se puede eliminar",
+
+        text: mensaje,
+
+        confirmButtonText: "Entendido",
+      });
     }
   };
 
+  /* =================================================
+     REFRESCAR
+  ================================================= */
+
+  const handleRefresh = async () => {
+    await loadObras();
+  };
+
+  /* =================================================
+     LIMPIAR FILTROS
+  ================================================= */
+
+  const limpiarFiltros = () => {
+    setSearch("");
+
+    setEstadoFiltro("todos");
+  };
+
+  /* =================================================
+     RENDER
+  ================================================= */
+
   return (
     <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Gestión de Obras</h1>
-          <p className="text-gray-500 mt-1">
-            Administración de obras, presupuesto, estado, personal asignado y
-            control diario.
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Gestión de Obras
+          </p>
+
+          <h1 className="mt-1 text-3xl font-bold text-slate-900">Obras</h1>
+
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+            Administra las obras, clientes, presupuesto, estado, personal,
+            controles diarios y trazabilidad de cada proyecto.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition">
-            <FileDown size={18} />
-            Exportar PDF
-          </button>
-
           <button
-            onClick={loadObras}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 transition"
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw size={18} />
+            <RefreshCw size={17} className={loading ? "animate-spin" : ""} />
             Actualizar
           </button>
 
           <button
+            type="button"
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition"
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
           >
             <Plus size={18} />
-            Nueva Obra
+            Nueva obra
           </button>
         </div>
       </div>
 
-      {/* KPIS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+      {/* =================================================
+          KPIS
+      ================================================= */}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {/* TOTAL */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-gray-500">Obras registradas</p>
-              <h2 className="text-3xl font-bold mt-2">{resumen.total}</h2>
+              <p className="text-sm font-medium text-slate-500">
+                Obras registradas
+              </p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {resumen.total}
+              </p>
             </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <Building2 className="text-blue-600" />
+
+            <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+              <Building2 size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        {/* EN PROCESO */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-gray-500">En proceso</p>
-              <h2 className="text-3xl font-bold mt-2">{resumen.enProceso}</h2>
+              <p className="text-sm font-medium text-slate-500">En proceso</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {resumen.enProceso}
+              </p>
             </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <ClipboardList className="text-green-600" />
+
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+              <ClipboardList size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        {/* PLANIFICADAS */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-gray-500">Planificadas</p>
-              <h2 className="text-3xl font-bold mt-2">
+              <p className="text-sm font-medium text-slate-500">Planificadas</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
                 {resumen.planificadas}
-              </h2>
+              </p>
             </div>
-            <div className="bg-gray-100 p-3 rounded-full">
-              <Clock className="text-gray-600" />
+
+            <div className="rounded-xl bg-slate-100 p-3 text-slate-600">
+              <Clock size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
+        {/* FINALIZADAS */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-gray-500">Pausadas</p>
-              <h2 className="text-3xl font-bold mt-2">{resumen.pausadas}</h2>
+              <p className="text-sm font-medium text-slate-500">Finalizadas</p>
+
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {resumen.finalizadas}
+              </p>
+
+              {(resumen.pausadas > 0 || resumen.canceladas > 0) && (
+                <p className="mt-1 text-xs text-slate-400">
+                  {resumen.pausadas} pausadas · {resumen.canceladas} canceladas
+                </p>
+              )}
             </div>
-            <div className="bg-yellow-100 p-3 rounded-full">
-              <PauseCircle className="text-yellow-600" />
+
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+              <CheckCircle size={22} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-5">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-500">Presupuesto total</p>
-              <h2 className="text-3xl font-bold mt-2">
-                ${resumen.presupuestoTotal.toLocaleString()}
-              </h2>
+        {/* PRESUPUESTO */}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-500">
+                Presupuesto total
+              </p>
+
+              <p className="mt-2 truncate text-2xl font-bold text-slate-900">
+                {formatCurrency(resumen.presupuestoTotal)}
+              </p>
             </div>
-            <div className="bg-purple-100 p-3 rounded-full">
-              <DollarSign className="text-purple-600" />
+
+            <div className="rounded-xl bg-violet-50 p-3 text-violet-600">
+              <DollarSign size={22} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div className="bg-white rounded-xl shadow border p-5">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="relative lg:col-span-3">
-            <Search size={18} className="absolute left-3 top-3 text-gray-400" />
-            <input
-              placeholder="Buscar por código, nombre, ubicación o estado..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full border rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
+      {/* =================================================
+          FILTROS
+      ================================================= */}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="flex-1">
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Buscar obra
+            </label>
+
+            <div className="relative">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Código, nombre, cliente, ubicación o estado..."
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              />
+            </div>
           </div>
 
-          <select
-            value={estadoFiltro}
-            onChange={(e) => setEstadoFiltro(e.target.value)}
-            className="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-          >
-            <option value="todos">Todos los estados</option>
-            <option value="planificada">Planificada</option>
-            <option value="en_proceso">En proceso</option>
-            <option value="pausada">Pausada</option>
-            <option value="finalizada">Finalizada</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
+          <div className="w-full lg:w-64">
+            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+              Estado
+            </label>
+
+            <select
+              value={estadoFiltro}
+              onChange={(event) =>
+                setEstadoFiltro(event.target.value as EstadoFiltro)
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+            >
+              <option value="todos">Todos los estados</option>
+
+              <option value="planificada">Planificada</option>
+
+              <option value="en_proceso">En proceso</option>
+
+              <option value="pausada">Pausada</option>
+
+              <option value="finalizada">Finalizada</option>
+
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+
+          {(search || estadoFiltro !== "todos") && (
+            <button
+              type="button"
+              onClick={limpiarFiltros}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
+          <p className="text-sm text-slate-500">
+            Mostrando{" "}
+            <strong className="text-slate-700">{filtered.length}</strong> de{" "}
+            <strong className="text-slate-700">{obras.length}</strong> obras.
+          </p>
         </div>
       </div>
 
-      {/* TABLA */}
-      <div className="bg-white rounded-xl shadow border overflow-hidden">
-        <div className="p-5 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Listado de obras
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Desde el detalle puedes gestionar empleados, actividades diarias,
-            pagos, gastos y reportes.
+      {/* =================================================
+          TABLA
+      ================================================= */}
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-bold text-slate-900">Listado de obras</h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Ingresa al detalle para gestionar personal, controles, pagos, gastos
+            y reportes de cada obra.
           </p>
         </div>
 
         {loading ? (
-          <div className="text-center py-10 text-gray-500">
-            Cargando obras...
+          <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-slate-500">
+            <RefreshCw size={28} className="animate-spin" />
+
+            <p className="text-sm">Cargando obras...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+            <div className="mb-3 rounded-full bg-slate-100 p-4 text-slate-400">
+              <Building2 size={30} />
+            </div>
+
+            <h3 className="font-semibold text-slate-700">
+              No se encontraron obras
+            </h3>
+
+            <p className="mt-1 max-w-md text-sm text-slate-500">
+              {obras.length === 0
+                ? "Todavía no existen obras registradas."
+                : "No existen obras que coincidan con los filtros aplicados."}
+            </p>
+
+            {obras.length === 0 && (
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                <Plus size={17} />
+                Crear primera obra
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">
+            <table className="w-full min-w-[1000px]">
+              <thead className="bg-slate-50">
+                <tr className="border-b border-slate-200">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Obra
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">
+
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Cliente
+                  </th>
+
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Ubicación
                   </th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">
+
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Fechas
                   </th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold">
+
+                  <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Presupuesto
                   </th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">
+
+                  <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Estado
                   </th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">
+
+                  <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Acciones
                   </th>
                 </tr>
               </thead>
 
-              <tbody>
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500">
-                      No hay obras registradas
-                    </td>
-                  </tr>
-                )}
-
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((obra) => (
-                  <tr
-                    key={obra.id}
-                    className="border-t hover:bg-gray-50 transition"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-gray-800">
-                        {obra.nombre}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Código: {obra.codigo || "---"}
-                      </p>
+                  <tr key={obra.id} className="transition hover:bg-slate-50/80">
+                    {/* OBRA */}
+
+                    <td className="px-5 py-4">
+                      <div className="min-w-[170px]">
+                        <Link
+                          to={`/dashboard/obras/${obra.id}`}
+                          className="font-semibold text-slate-900 transition hover:text-[var(--color-primary)]"
+                        >
+                          {obra.nombre}
+                        </Link>
+
+                        <p className="mt-1 text-xs font-medium text-slate-400">
+                          {obra.codigo}
+                        </p>
+                      </div>
                     </td>
 
-                    <td className="px-4 py-3">
-                      <div className="flex items-start gap-2">
-                        <MapPin size={16} className="text-gray-400 mt-0.5" />
-                        <span className="text-sm">
+                    {/* CLIENTE */}
+
+                    <td className="px-5 py-4">
+                      <div className="max-w-[180px]">
+                        <p className="truncate text-sm font-medium text-slate-700">
+                          {obra.cliente_nombre || "Sin cliente"}
+                        </p>
+                      </div>
+                    </td>
+
+                    {/* UBICACIÓN */}
+
+                    <td className="px-5 py-4">
+                      <div className="flex max-w-[210px] items-start gap-2">
+                        <MapPin
+                          size={16}
+                          className="mt-0.5 shrink-0 text-slate-400"
+                        />
+
+                        <span className="text-sm text-slate-600">
                           {obra.ubicacion || "No registrada"}
                         </span>
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-sm">
-                        <CalendarDays size={15} className="text-gray-400" />
-                        {formatDate(obra.fecha_inicio)}
+                    {/* FECHAS */}
+
+                    <td className="px-5 py-4">
+                      <div className="flex items-start gap-2">
+                        <CalendarDays
+                          size={16}
+                          className="mt-0.5 shrink-0 text-slate-400"
+                        />
+
+                        <div className="text-sm">
+                          <p className="font-medium text-slate-700">
+                            {formatDate(obra.fecha_inicio)}
+                          </p>
+
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            Hasta {formatDate(obra.fecha_fin)}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500">
-                        hasta {formatDate(obra.fecha_fin)}
-                      </p>
                     </td>
 
-                    <td className="px-4 py-3 text-right font-bold text-green-600">
-                      ${Number(obra.presupuesto || 0).toLocaleString()}
+                    {/* PRESUPUESTO */}
+
+                    <td className="px-5 py-4 text-right">
+                      <span className="font-semibold text-slate-800">
+                        {formatCurrency(obra.presupuesto)}
+                      </span>
                     </td>
 
-                    <td className="px-4 py-3 text-center">
+                    {/* ESTADO */}
+
+                    <td className="px-5 py-4 text-center">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium capitalize ${getEstadoClass(
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEstadoClass(
                           obra.estado,
                         )}`}
                       >
                         {getEstadoIcon(obra.estado)}
-                        {obra.estado?.replace("_", " ")}
+
+                        {getEstadoLabel(obra.estado)}
                       </span>
                     </td>
 
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-3">
+                    {/* ACCIONES */}
+
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-center gap-1">
                         <Link
                           to={`/dashboard/obras/${obra.id}`}
-                          className="text-cyan-600 hover:scale-110 transition"
                           title="Ver detalle"
+                          aria-label={`Ver detalle de ${obra.nombre}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-cyan-600 transition hover:bg-cyan-50"
                         >
                           <Eye size={18} />
                         </Link>
 
                         <button
-                          className="text-blue-600 hover:scale-110 transition"
-                          title="Editar"
-                          onClick={() => {
-                            setSelectedObra(obra);
-                            setEditOpen(true);
-                          }}
+                          type="button"
+                          title="Editar obra"
+                          aria-label={`Editar ${obra.nombre}`}
+                          onClick={() => handleOpenEdit(obra)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50"
                         >
                           <Edit size={18} />
                         </button>
 
                         <button
-                          onClick={() => handleDelete(obra.id)}
-                          className="text-red-600 hover:scale-110 transition"
-                          title="Eliminar"
+                          type="button"
+                          title="Eliminar obra"
+                          aria-label={`Eliminar ${obra.nombre}`}
+                          onClick={() => void handleDelete(obra)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-50"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -415,52 +848,79 @@ function ObrasPage() {
         )}
       </div>
 
-      {/* PANEL INFERIOR */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow border p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Flujo operativo de obra
+      {/* =================================================
+          INFORMACIÓN DEL MÓDULO
+      ================================================= */}
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">
+            Flujo operativo de una obra
           </h2>
 
-          <div className="space-y-3">
-            <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
-              <p className="font-semibold text-blue-800">Control diario</p>
-              <p className="text-sm text-blue-700">
-                Cada obra puede registrar actividades diarias, avance, clima y
-                observaciones.
+          <p className="mt-1 text-sm text-slate-500">
+            Los procesos de la obra permanecen relacionados para mantener la
+            trazabilidad.
+          </p>
+
+          <div className="mt-5 space-y-3">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <p className="font-semibold text-blue-900">Control diario</p>
+
+              <p className="mt-1 text-sm leading-6 text-blue-700">
+                Registra actividades, avance, horarios, clima y observaciones de
+                cada jornada.
               </p>
             </div>
 
-            <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
-              <p className="font-semibold text-purple-800">Personal asignado</p>
-              <p className="text-sm text-purple-700">
-                Los empleados se asignan a una obra para controlar pagos y
-                rendimiento.
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+              <p className="font-semibold text-violet-900">Personal asignado</p>
+
+              <p className="mt-1 text-sm leading-6 text-violet-700">
+                Relaciona a cada empleado con la obra y su asignación para
+                posteriormente controlar sus pagos.
               </p>
             </div>
 
-            <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-              <p className="font-semibold text-red-800">Gastos de obra</p>
-              <p className="text-sm text-red-700">
-                Los gastos vinculados a obra deben generar egresos automáticos
-                en finanzas.
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <p className="font-semibold text-rose-900">Gastos y finanzas</p>
+
+              <p className="mt-1 text-sm leading-6 text-rose-700">
+                Los gastos confirmados generan egresos y quedan vinculados a la
+                obra para conservar la trazabilidad financiera.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow border p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Reglas ERP
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">
+            Reglas de integridad
           </h2>
 
-          <p className="text-sm text-gray-600 leading-6">
-            La obra funciona como centro de costo. Los pagos de empleados,
-            gastos diarios y actividades deben quedar vinculados a su obra para
-            calcular avance, costos, utilidad estimada y reportes consolidados.
+          <p className="mt-3 text-sm leading-7 text-slate-600">
+            Cada obra funciona como un centro de operación y de costo. Los pagos
+            de empleados, gastos, controles diarios y movimientos financieros
+            deben permanecer vinculados a la obra correspondiente.
           </p>
+
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="font-semibold text-amber-900">
+              Eliminación protegida
+            </p>
+
+            <p className="mt-1 text-sm leading-6 text-amber-800">
+              Una obra con historial operativo o financiero no se elimina. En
+              ese caso debe utilizarse el estado <strong>Cancelada</strong> para
+              conservar sus registros históricos.
+            </p>
+          </div>
         </div>
       </div>
+
+      {/* =================================================
+          CREATE MODAL
+      ================================================= */}
 
       <CreateObraModal
         open={modalOpen}
@@ -468,11 +928,15 @@ function ObrasPage() {
         onCreated={loadObras}
       />
 
+      {/* =================================================
+          EDIT MODAL
+      ================================================= */}
+
       <EditObraModal
         open={editOpen}
-        onClose={() => setEditOpen(false)}
-        onUpdated={loadObras}
         obra={selectedObra}
+        onClose={handleCloseEdit}
+        onUpdated={loadObras}
       />
     </div>
   );

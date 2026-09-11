@@ -1,366 +1,737 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Swal from "sweetalert2";
 
-import { createObra } from "../../services/obrasService";
+import { createObra, type EstadoObra } from "../../services/obrasService";
 
 import { getClientes } from "../../../../clientes/service/clienteService";
 
+/* =====================================================
+   TIPOS
+===================================================== */
+
 interface Props {
   open: boolean;
+
   onClose: () => void;
-  onCreated: () => void;
+
+  onCreated: () => void | Promise<void>;
 }
 
 interface Cliente {
   id: string;
-  nombre: string;
-  apellido?: string;
+
+  nombre?: string | null;
+
+  apellido?: string | null;
+
+  razon_social?: string | null;
+
+  tipo?: string | null;
+
+  activo?: boolean;
 }
+
+interface FormState {
+  codigo: string;
+
+  nombre: string;
+
+  cliente_id: string;
+
+  descripcion: string;
+
+  ubicacion: string;
+
+  fecha_inicio: string;
+
+  fecha_fin: string;
+
+  estado: EstadoObra;
+
+  presupuesto: string;
+}
+
+/* =====================================================
+   CONSTANTES
+===================================================== */
+
+const ESTADOS: {
+  value: EstadoObra;
+  label: string;
+}[] = [
+  {
+    value: "planificada",
+    label: "Planificada",
+  },
+  {
+    value: "en_proceso",
+    label: "En proceso",
+  },
+  {
+    value: "pausada",
+    label: "Pausada",
+  },
+  {
+    value: "finalizada",
+    label: "Finalizada",
+  },
+  {
+    value: "cancelada",
+    label: "Cancelada",
+  },
+];
+
+const FORM_INICIAL: FormState = {
+  codigo: "",
+
+  nombre: "",
+
+  cliente_id: "",
+
+  descripcion: "",
+
+  ubicacion: "",
+
+  fecha_inicio: "",
+
+  fecha_fin: "",
+
+  presupuesto: "",
+
+  estado: "planificada",
+};
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+const obtenerNombreCliente = (cliente: Cliente) => {
+  if (cliente.tipo === "empresa" && cliente.razon_social) {
+    return cliente.razon_social;
+  }
+
+  const nombreCompleto = [cliente.nombre, cliente.apellido]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return nombreCompleto || cliente.razon_social || "Cliente";
+};
+
+const obtenerMensajeError = (error: unknown) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const axiosError = error as {
+      response?: {
+        data?: {
+          message?: string;
+          errors?: {
+            mensaje?: string;
+          }[];
+        };
+      };
+    };
+
+    const backendError = axiosError.response?.data;
+
+    if (backendError?.errors && backendError.errors.length > 0) {
+      return backendError.errors
+        .map((item) => item.mensaje)
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    return backendError?.message || "No se pudo crear la obra.";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "No se pudo crear la obra.";
+};
+
+/* =====================================================
+   COMPONENTE
+===================================================== */
 
 function CreateObraModal({ open, onClose, onCreated }: Props) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
 
-  const [form, setForm] = useState<{
-    codigo: string;
-    nombre: string;
-
-    cliente_id: string;
-
-    descripcion: string;
-
-    ubicacion: string;
-
-    fecha_inicio: string;
-
-    fecha_fin: string;
-
-    estado:
-      | "planificada"
-      | "en_proceso"
-      | "pausada"
-      | "finalizada"
-      | "cancelada";
-
-    presupuesto: string;
-  }>({
-    codigo: "",
-
-    nombre: "",
-
-    cliente_id: "",
-
-    descripcion: "",
-
-    ubicacion: "",
-
-    fecha_inicio: "",
-
-    fecha_fin: "",
-
-    presupuesto: "",
-
-    estado: "planificada",
-  });
+  const [cargandoClientes, setCargandoClientes] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
-  /* =========================
-     LOAD CLIENTES
-  ========================= */
+  const [form, setForm] = useState<FormState>(FORM_INICIAL);
+
+  /* =================================================
+     CARGAR CLIENTES
+  ================================================= */
+
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let mounted = true;
+
     const loadClientes = async () => {
       try {
+        setCargandoClientes(true);
+
         const data = await getClientes();
 
-        setClientes(data);
+        if (!mounted) {
+          return;
+        }
+
+        setClientes(
+          Array.isArray(data)
+            ? data.filter((cliente: Cliente) => cliente.activo !== false)
+            : [],
+        );
       } catch (error) {
-        console.error(error);
+        console.error("Error cargando clientes:", error);
+
+        if (mounted) {
+          setClientes([]);
+        }
+      } finally {
+        if (mounted) {
+          setCargandoClientes(false);
+        }
       }
     };
 
+    void loadClientes();
+
+    return () => {
+      mounted = false;
+    };
+  }, [open]);
+
+  /* =================================================
+     RESET AL ABRIR
+  ================================================= */
+
+  useEffect(() => {
     if (open) {
-      loadClientes();
+      setForm(FORM_INICIAL);
     }
   }, [open]);
 
-  if (!open) return null;
+  /* =================================================
+     BLOQUEAR SCROLL
+  ================================================= */
 
-  /* =========================
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const overflowAnterior = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = overflowAnterior;
+    };
+  }, [open]);
+
+  /* =================================================
+     CERRAR CON ESCAPE
+  ================================================= */
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !loading) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, loading, onClose]);
+
+  /* =================================================
+     VALIDACIÓN
+  ================================================= */
+
+  const errores = useMemo(() => {
+    const mensajes: string[] = [];
+
+    const codigo = form.codigo.trim();
+
+    const nombre = form.nombre.trim();
+
+    if (!codigo) {
+      mensajes.push("El código de la obra es obligatorio.");
+    }
+
+    if (codigo.length > 30) {
+      mensajes.push("El código no puede superar los 30 caracteres.");
+    }
+
+    if (!nombre) {
+      mensajes.push("El nombre de la obra es obligatorio.");
+    }
+
+    if (nombre && nombre.length < 3) {
+      mensajes.push("El nombre debe tener al menos 3 caracteres.");
+    }
+
+    if (nombre.length > 150) {
+      mensajes.push("El nombre no puede superar los 150 caracteres.");
+    }
+
+    if (form.presupuesto !== "") {
+      const presupuesto = Number(form.presupuesto);
+
+      if (!Number.isFinite(presupuesto) || presupuesto < 0) {
+        mensajes.push(
+          "El presupuesto debe ser un valor válido mayor o igual a 0.",
+        );
+      }
+    }
+
+    if (
+      form.fecha_inicio &&
+      form.fecha_fin &&
+      form.fecha_fin < form.fecha_inicio
+    ) {
+      mensajes.push(
+        "La fecha de finalización no puede ser anterior a la fecha de inicio.",
+      );
+    }
+
+    if (form.descripcion.length > 2000) {
+      mensajes.push("La descripción no puede superar los 2000 caracteres.");
+    }
+
+    return mensajes;
+  }, [form]);
+
+  /* =================================================
      HANDLE CHANGE
-  ========================= */
+  ================================================= */
+
   const handleChange = (
-    e: React.ChangeEvent<
+    event: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = event.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  /* =========================
+  /* =================================================
      SUBMIT
-  ========================= */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  ================================================= */
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (errores.length > 0) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Revisa la información",
+        html: `
+          <div style="text-align:left">
+            ${errores
+              .map(
+                (mensaje) =>
+                  `<div style="margin-bottom:6px">• ${mensaje}</div>`,
+              )
+              .join("")}
+          </div>
+        `,
+        confirmButtonText: "Entendido",
+      });
+
+      return;
+    }
 
     try {
       setLoading(true);
 
       await createObra({
-        codigo: form.codigo,
+        codigo: form.codigo.trim(),
 
-        nombre: form.nombre,
+        nombre: form.nombre.trim(),
 
-        cliente_id: form.cliente_id || undefined,
+        cliente_id: form.cliente_id || null,
 
-        descripcion: form.descripcion,
+        descripcion: form.descripcion.trim() || null,
 
-        ubicacion: form.ubicacion,
+        ubicacion: form.ubicacion.trim() || null,
 
-        fecha_inicio: form.fecha_inicio,
+        fecha_inicio: form.fecha_inicio || null,
 
-        fecha_fin: form.fecha_fin,
+        fecha_fin: form.fecha_fin || null,
 
         estado: form.estado,
 
-        presupuesto: Number(form.presupuesto || 0),
+        presupuesto: form.presupuesto === "" ? 0 : Number(form.presupuesto),
       });
 
-      Swal.fire({
+      await Swal.fire({
         icon: "success",
         title: "Obra creada correctamente",
-        timer: 1400,
+        text: "La nueva obra fue registrada en el sistema.",
+        timer: 1500,
         showConfirmButton: false,
       });
 
-      onCreated();
+      setForm(FORM_INICIAL);
+
+      await onCreated();
 
       onClose();
+    } catch (error) {
+      console.error("Error creando obra:", error);
 
-      /* RESET */
-      setForm({
-        codigo: "",
-
-        nombre: "",
-
-        cliente_id: "",
-
-        descripcion: "",
-
-        ubicacion: "",
-
-        fecha_inicio: "",
-
-        fecha_fin: "",
-
-        presupuesto: "",
-
-        estado: "planificada",
+      await Swal.fire({
+        icon: "error",
+        title: "No se pudo crear la obra",
+        text: obtenerMensajeError(error),
+        confirmButtonText: "Cerrar",
       });
-    } catch (error: any) {
-      Swal.fire(
-        "Error",
-        error.response?.data?.message || "No se pudo crear la obra",
-        "error",
-      );
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-4xl p-6 shadow-lg max-h-[90vh] overflow-y-auto">
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">Nueva Obra</h2>
+  /* =================================================
+     RENDER
+  ================================================= */
 
-            <p className="text-sm text-gray-500 mt-1">
-              Registra una nueva obra en el sistema
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !loading) {
+          onClose();
+        }
+      }}
+    >
+      <div className="my-6 w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Gestión de Obras
+            </p>
+
+            <h2 className="mt-1 text-2xl font-bold text-slate-900">
+              Nueva obra
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Registra la información general para comenzar la gestión de la
+              obra.
             </p>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-black text-xl"
+            disabled={loading}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Cerrar"
           >
-            ✕
+            ×
           </button>
         </div>
 
-        {/* FORM */}
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          {/* CODIGO */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">Código</label>
+        {/* =================================================
+            FORMULARIO
+        ================================================= */}
 
-            <input
-              type="text"
-              name="codigo"
-              placeholder="Ej: OBR-001"
-              value={form.codigo}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-5 p-6 md:grid-cols-2">
+            {/* CÓDIGO */}
 
-          {/* NOMBRE */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">
-              Nombre Obra
-            </label>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Código
+                <span className="ml-1 text-rose-500">*</span>
+              </label>
 
-            <input
-              type="text"
-              name="nombre"
-              placeholder="Nombre de la obra"
-              value={form.nombre}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-              required
-            />
-          </div>
+              <input
+                type="text"
+                name="codigo"
+                value={form.codigo}
+                onChange={handleChange}
+                disabled={loading}
+                maxLength={30}
+                placeholder="Ej. OBR-001"
+                autoComplete="off"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              />
 
-          {/* CLIENTE */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">Cliente</label>
+              <p className="mt-1 text-xs text-slate-400">
+                Debe ser único dentro del sistema.
+              </p>
+            </div>
 
-            <select
-              name="cliente_id"
-              value={form.cliente_id}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-            >
-              <option value="">Seleccione un cliente</option>
+            {/* NOMBRE */}
 
-              {clientes.map((cliente) => (
-                <option key={cliente.id} value={cliente.id}>
-                  {cliente.nombre} {cliente.apellido || ""}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Nombre de la obra
+                <span className="ml-1 text-rose-500">*</span>
+              </label>
+
+              <input
+                type="text"
+                name="nombre"
+                value={form.nombre}
+                onChange={handleChange}
+                disabled={loading}
+                maxLength={150}
+                placeholder="Nombre de la obra"
+                autoComplete="off"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              />
+            </div>
+
+            {/* CLIENTE */}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Cliente
+              </label>
+
+              <select
+                name="cliente_id"
+                value={form.cliente_id}
+                onChange={handleChange}
+                disabled={loading || cargandoClientes}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              >
+                <option value="">
+                  {cargandoClientes
+                    ? "Cargando clientes..."
+                    : "Sin cliente asignado"}
                 </option>
-              ))}
-            </select>
+
+                {clientes.map((cliente) => (
+                  <option key={cliente.id} value={cliente.id}>
+                    {obtenerNombreCliente(cliente)}
+                  </option>
+                ))}
+              </select>
+
+              {!cargandoClientes && clientes.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  No hay clientes disponibles para seleccionar.
+                </p>
+              )}
+            </div>
+
+            {/* ESTADO */}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Estado inicial
+              </label>
+
+              <select
+                name="estado"
+                value={form.estado}
+                onChange={handleChange}
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              >
+                {ESTADOS.map((estado) => (
+                  <option key={estado.value} value={estado.value}>
+                    {estado.label}
+                  </option>
+                ))}
+              </select>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Normalmente una nueva obra inicia como Planificada.
+              </p>
+            </div>
+
+            {/* UBICACIÓN */}
+
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Ubicación
+              </label>
+
+              <input
+                type="text"
+                name="ubicacion"
+                value={form.ubicacion}
+                onChange={handleChange}
+                disabled={loading}
+                placeholder="Ej. Riobamba, Chimborazo"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              />
+            </div>
+
+            {/* FECHA INICIO */}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Fecha de inicio
+              </label>
+
+              <input
+                type="date"
+                name="fecha_inicio"
+                value={form.fecha_inicio}
+                onChange={handleChange}
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              />
+            </div>
+
+            {/* FECHA FIN */}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Fecha de finalización
+              </label>
+
+              <input
+                type="date"
+                name="fecha_fin"
+                value={form.fecha_fin}
+                min={form.fecha_inicio || undefined}
+                onChange={handleChange}
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              />
+            </div>
+
+            {/* PRESUPUESTO */}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Presupuesto
+              </label>
+
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-slate-400">
+                  $
+                </span>
+
+                <input
+                  type="number"
+                  name="presupuesto"
+                  value={form.presupuesto}
+                  onChange={handleChange}
+                  disabled={loading}
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-8 pr-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                />
+              </div>
+            </div>
+
+            {/* RESUMEN ESTADO */}
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Situación
+              </label>
+
+              <div className="flex min-h-[42px] items-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-600">
+                {ESTADOS.find((item) => item.value === form.estado)?.label}
+              </div>
+            </div>
+
+            {/* DESCRIPCIÓN */}
+
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                Descripción
+              </label>
+
+              <textarea
+                name="descripcion"
+                value={form.descripcion}
+                onChange={handleChange}
+                disabled={loading}
+                rows={4}
+                maxLength={2000}
+                placeholder="Descripción general, alcance o información adicional de la obra..."
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+              />
+
+              <div className="mt-1 flex justify-end">
+                <span className="text-xs text-slate-400">
+                  {form.descripcion.length}
+                  /2000
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* ESTADO */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">Estado</label>
+          {/* =================================================
+              INFO
+          ================================================= */}
 
-            <select
-              name="estado"
-              value={form.estado}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-            >
-              <option value="planificada">Planificada</option>
+          <div className="mx-6 mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+            <p className="text-sm font-semibold text-sky-900">
+              Después de crear la obra
+            </p>
 
-              <option value="en_proceso">En Proceso</option>
-
-              <option value="pausada">Pausada</option>
-
-              <option value="finalizada">Finalizada</option>
-
-              <option value="cancelada">Cancelada</option>
-            </select>
+            <p className="mt-1 text-sm leading-6 text-sky-800">
+              Podrás asignar empleados, registrar controles diarios, gestionar
+              gastos, realizar pagos al personal y consultar los reportes
+              financieros de esta obra.
+            </p>
           </div>
 
-          {/* UBICACION */}
-          <div className="md:col-span-2">
-            <label className="block text-sm mb-1 font-medium">Ubicación</label>
+          {/* =================================================
+              FOOTER
+          ================================================= */}
 
-            <input
-              type="text"
-              name="ubicacion"
-              placeholder="Dirección o ubicación"
-              value={form.ubicacion}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-            />
-          </div>
-
-          {/* FECHA INICIO */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">
-              Fecha Inicio
-            </label>
-
-            <input
-              type="date"
-              name="fecha_inicio"
-              value={form.fecha_inicio}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-            />
-          </div>
-
-          {/* FECHA FIN */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">Fecha Fin</label>
-
-            <input
-              type="date"
-              name="fecha_fin"
-              value={form.fecha_fin}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-            />
-          </div>
-
-          {/* PRESUPUESTO */}
-          <div>
-            <label className="block text-sm mb-1 font-medium">
-              Presupuesto
-            </label>
-
-            <input
-              type="number"
-              name="presupuesto"
-              placeholder="0.00"
-              value={form.presupuesto}
-              onChange={handleChange}
-              className="border rounded-lg px-3 py-2 w-full"
-            />
-          </div>
-
-          {/* DESCRIPCION */}
-          <div className="md:col-span-2">
-            <label className="block text-sm mb-1 font-medium">
-              Descripción
-            </label>
-
-            <textarea
-              name="descripcion"
-              placeholder="Descripción de la obra"
-              value={form.descripcion}
-              onChange={handleChange}
-              rows={4}
-              className="border rounded-lg px-3 py-2 w-full"
-            />
-          </div>
-
-          {/* BOTONES */}
-          <div className="md:col-span-2 flex justify-end gap-3 mt-4">
+          <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              disabled={loading}
+              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancelar
             </button>
 
             <button
               type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
+              disabled={loading || cargandoClientes}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Guardando..." : "Guardar"}
+              {loading && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              )}
+
+              {loading ? "Guardando..." : "Crear obra"}
             </button>
           </div>
         </form>
