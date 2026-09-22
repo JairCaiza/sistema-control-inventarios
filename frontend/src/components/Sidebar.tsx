@@ -135,8 +135,24 @@ const obtenerRolesUsuario = (usuario: UsuarioLocal | null): string[] => {
    SIDEBAR
 ===================================================== */
 
-function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
+  /* =====================================================
+     CERRAR SIDEBAR MÓVIL AL CAMBIAR DE RUTA
+  ===================================================== */
+
+  useEffect(() => {
+    if (mobileOpen) {
+      onMobileClose();
+    }
+    // El cierre debe ocurrir únicamente cuando cambia la ruta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   /* =====================================================
      SIDEBAR COLAPSADO
@@ -367,26 +383,72 @@ function Sidebar() {
   ===================================================== */
 
   return (
-    <aside
-      className={`
-        ${collapsed ? "w-20" : "w-64"}
-        h-screen
-        overflow-y-auto
-        bg-[var(--color-bg-dark)]
-        text-white
-        flex
-        flex-col
-        transition-all
-        duration-300
-        shadow-lg
-      `}
-    >
-      {/* =================================================
+    <>
+      {/* =====================================================
+          FONDO OSCURO - SOLO MÓVIL
+      ===================================================== */}
+
+      {mobileOpen && (
+        <button
+          type="button"
+          onClick={onMobileClose}
+          aria-label="Cerrar menú"
+          className="
+            fixed
+            inset-0
+            z-40
+            bg-black/50
+            lg:hidden
+          "
+        />
+      )}
+
+      {/* =====================================================
+          SIDEBAR
+      ===================================================== */}
+
+      <aside
+        className={`
+          fixed
+          inset-y-0
+          left-0
+          z-50
+
+          w-72
+          max-w-[85vw]
+          h-screen
+
+          overflow-y-auto
+
+          bg-[var(--color-bg-dark)]
+          text-white
+
+          flex
+          flex-col
+
+          shadow-xl
+
+          transition-all
+          duration-300
+          ease-in-out
+
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+
+          lg:relative
+          lg:inset-auto
+          lg:z-auto
+          lg:max-w-none
+          lg:flex-shrink-0
+
+          ${collapsed ? "lg:w-20" : "lg:w-64"}
+        `}
+      >
+        {/* =================================================
           HEADER
       ================================================= */}
 
-      <div
-        className="
+        <div
+          className="
           flex
           items-center
           justify-between
@@ -398,544 +460,552 @@ function Sidebar() {
           bg-[var(--color-bg-dark)]
           z-10
         "
-      >
-        <div
-          className="
+        >
+          <div
+            className="
             flex
             items-center
             gap-2
           "
-        >
-          <img
-            src={logo}
-            className="
+          >
+            <img
+              src={logo}
+              className="
               w-10
               h-10
               object-contain
             "
-            alt="ConstructSys"
-          />
+              alt="ConstructSys"
+            />
 
-          {!collapsed && (
-            <span
-              className="
+            {(!collapsed || mobileOpen) && (
+              <span
+                className="
                 font-bold
                 text-lg
               "
-            >
-              ConstructSys
-            </span>
-          )}
-        </div>
+              >
+                ConstructSys
+              </span>
+            )}
+          </div>
 
-        <button
-          type="button"
-          onClick={() => setCollapsed((prev) => !prev)}
-          className="
+          <button
+            type="button"
+            onClick={() => setCollapsed((prev) => !prev)}
+            className="
+            hidden
+            lg:flex
+            items-center
+            justify-center
             text-gray-300
             hover:text-white
             transition
           "
-          aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
-        >
-          {collapsed ? (
-            <PanelLeftOpen size={20} />
-          ) : (
-            <PanelLeftClose size={20} />
-          )}
-        </button>
-      </div>
+            aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen size={20} />
+            ) : (
+              <PanelLeftClose size={20} />
+            )}
+          </button>
+        </div>
 
-      {/* =================================================
+        {/* =================================================
           MENÚ
       ================================================= */}
 
-      <nav
-        className="
+        <nav
+          className="
           flex-1
           p-3
           space-y-2
           text-sm
         "
-      >
-        {/* =================================================
+        >
+          {/* =================================================
             DASHBOARD
         ================================================= */}
 
-        <Link
-          to="/dashboard"
-          title="Dashboard"
-          className={claseItemPrincipal(isActive("/dashboard"))}
-        >
-          <LayoutDashboard size={18} />
+          <Link
+            to="/dashboard"
+            title="Dashboard"
+            className={claseItemPrincipal(isActive("/dashboard"))}
+          >
+            <LayoutDashboard size={18} />
 
-          {!collapsed && "Dashboard"}
-        </Link>
+            {(!collapsed || mobileOpen) && "Dashboard"}
+          </Link>
 
-        {/* =================================================
+          {/* =================================================
             ADMINISTRACIÓN
         ================================================= */}
 
-        <button
-          type="button"
-          onClick={() => setOpenAdmin((prev) => !prev)}
-          className={claseBotonSeccion(adminAbierto)}
-        >
-          <span
-            className="
+          <button
+            type="button"
+            onClick={() => setOpenAdmin((prev) => !prev)}
+            className={claseBotonSeccion(adminAbierto)}
+          >
+            <span
+              className="
               flex
               items-center
               gap-3
             "
-          >
-            <Shield size={18} />
+            >
+              <Shield size={18} />
 
-            {!collapsed && "Administración"}
-          </span>
+              {(!collapsed || mobileOpen) && "Administración"}
+            </span>
 
-          {!collapsed && (
-            <ChevronDown
-              size={16}
-              className={`
+            {(!collapsed || mobileOpen) && (
+              <ChevronDown
+                size={16}
+                className={`
                 transition
                 ${adminAbierto ? "rotate-180" : ""}
               `}
-            />
-          )}
-        </button>
+              />
+            )}
+          </button>
 
-        {adminAbierto && !collapsed && (
-          <div
-            className="
+          {adminAbierto && (!collapsed || mobileOpen) && (
+            <div
+              className="
               ml-6
               space-y-1
             "
-          >
-            <Link
-              to="/dashboard/usuarios"
-              className={claseSubItem(isActive("/dashboard/usuarios"))}
             >
-              <Users size={16} />
-              Usuarios
-            </Link>
+              <Link
+                to="/dashboard/usuarios"
+                className={claseSubItem(isActive("/dashboard/usuarios"))}
+              >
+                <Users size={16} />
+                Usuarios
+              </Link>
 
-            <Link
-              to="/dashboard/roles"
-              className={claseSubItem(isActive("/dashboard/roles"))}
-            >
-              <Shield size={16} />
-              Roles
-            </Link>
-          </div>
-        )}
+              <Link
+                to="/dashboard/roles"
+                className={claseSubItem(isActive("/dashboard/roles"))}
+              >
+                <Shield size={16} />
+                Roles
+              </Link>
+            </div>
+          )}
 
-        {/* =================================================
+          {/* =================================================
             INVENTARIO
         ================================================= */}
 
-        <button
-          type="button"
-          onClick={() => setOpenInventario((prev) => !prev)}
-          className={claseBotonSeccion(inventarioAbierto)}
-        >
-          <span
-            className="
+          <button
+            type="button"
+            onClick={() => setOpenInventario((prev) => !prev)}
+            className={claseBotonSeccion(inventarioAbierto)}
+          >
+            <span
+              className="
               flex
               items-center
               gap-3
             "
-          >
-            <Package size={18} />
+            >
+              <Package size={18} />
 
-            {!collapsed && "Inventario"}
-          </span>
+              {(!collapsed || mobileOpen) && "Inventario"}
+            </span>
 
-          {!collapsed && (
-            <ChevronDown
-              size={16}
-              className={`
+            {(!collapsed || mobileOpen) && (
+              <ChevronDown
+                size={16}
+                className={`
                 transition
                 ${inventarioAbierto ? "rotate-180" : ""}
               `}
-            />
-          )}
-        </button>
+              />
+            )}
+          </button>
 
-        {inventarioAbierto && !collapsed && (
-          <div
-            className="
+          {inventarioAbierto && (!collapsed || mobileOpen) && (
+            <div
+              className="
               ml-6
               space-y-1
             "
-          >
-            <Link
-              to="/dashboard/categorias"
-              className={claseSubItem(isActive("/dashboard/categorias"))}
             >
-              Categorías
-            </Link>
+              <Link
+                to="/dashboard/categorias"
+                className={claseSubItem(isActive("/dashboard/categorias"))}
+              >
+                Categorías
+              </Link>
 
-            <Link
-              to="/dashboard/ubicaciones"
-              className={claseSubItem(isActive("/dashboard/ubicaciones"))}
-            >
-              Ubicaciones
-            </Link>
+              <Link
+                to="/dashboard/ubicaciones"
+                className={claseSubItem(isActive("/dashboard/ubicaciones"))}
+              >
+                Ubicaciones
+              </Link>
 
-            <Link
-              to="/dashboard/activos"
-              className={claseSubItem(isActive("/dashboard/activos"))}
-            >
-              Activos
-            </Link>
+              <Link
+                to="/dashboard/activos"
+                className={claseSubItem(isActive("/dashboard/activos"))}
+              >
+                Activos
+              </Link>
 
-            <Link
-              to="/dashboard/movimientos"
-              className={claseSubItem(isActive("/dashboard/movimientos"))}
-            >
-              Movimientos
-            </Link>
+              <Link
+                to="/dashboard/movimientos"
+                className={claseSubItem(isActive("/dashboard/movimientos"))}
+              >
+                Movimientos
+              </Link>
 
-            <Link
-              to="/dashboard/reportes/inventario"
-              className={claseSubItem(
-                isActive("/dashboard/reportes/inventario"),
-              )}
-            >
-              Reportes
-            </Link>
-          </div>
-        )}
+              <Link
+                to="/dashboard/reportes/inventario"
+                className={claseSubItem(
+                  isActive("/dashboard/reportes/inventario"),
+                )}
+              >
+                Reportes
+              </Link>
+            </div>
+          )}
 
-        {/* =================================================
+          {/* =================================================
             CLIENTES
         ================================================= */}
 
-        <Link
-          to="/dashboard/clientes"
-          title="Clientes"
-          className={claseItemPrincipal(isActive("/dashboard/clientes"))}
-        >
-          <FileText size={18} />
+          <Link
+            to="/dashboard/clientes"
+            title="Clientes"
+            className={claseItemPrincipal(isActive("/dashboard/clientes"))}
+          >
+            <FileText size={18} />
 
-          {!collapsed && "Clientes"}
-        </Link>
+            {(!collapsed || mobileOpen) && "Clientes"}
+          </Link>
 
-        {/* =================================================
+          {/* =================================================
             CONTRATOS
         ================================================= */}
 
-        <Link
-          to="/dashboard/contratos"
-          title="Contratos"
-          className={claseItemPrincipal(isActive("/dashboard/contratos"))}
-        >
-          <FileText size={18} />
+          <Link
+            to="/dashboard/contratos"
+            title="Contratos"
+            className={claseItemPrincipal(isActive("/dashboard/contratos"))}
+          >
+            <FileText size={18} />
 
-          {!collapsed && "Contratos"}
-        </Link>
+            {(!collapsed || mobileOpen) && "Contratos"}
+          </Link>
 
-        {/* =================================================
+          {/* =================================================
             DEVOLUCIONES
         ================================================= */}
 
-        <Link
-          to="/dashboard/devoluciones"
-          title="Devoluciones"
-          className={claseItemPrincipal(isActive("/dashboard/devoluciones"))}
-        >
-          <BarChart3 size={18} />
+          <Link
+            to="/dashboard/devoluciones"
+            title="Devoluciones"
+            className={claseItemPrincipal(isActive("/dashboard/devoluciones"))}
+          >
+            <BarChart3 size={18} />
 
-          {!collapsed && "Devoluciones"}
-        </Link>
+            {(!collapsed || mobileOpen) && "Devoluciones"}
+          </Link>
 
-        {/* =================================================
+          {/* =================================================
             GESTIÓN OBRAS
         ================================================= */}
 
-        <button
-          type="button"
-          onClick={() => setOpenObras((prev) => !prev)}
-          className={claseBotonSeccion(obrasAbierto)}
-        >
-          <span
-            className="
+          <button
+            type="button"
+            onClick={() => setOpenObras((prev) => !prev)}
+            className={claseBotonSeccion(obrasAbierto)}
+          >
+            <span
+              className="
               flex
               items-center
               gap-3
             "
-          >
-            <Hammer size={18} />
+            >
+              <Hammer size={18} />
 
-            {!collapsed && "Gestión Obras"}
-          </span>
+              {(!collapsed || mobileOpen) && "Gestión Obras"}
+            </span>
 
-          {!collapsed && (
-            <ChevronDown
-              size={16}
-              className={`
+            {(!collapsed || mobileOpen) && (
+              <ChevronDown
+                size={16}
+                className={`
                 transition
                 ${obrasAbierto ? "rotate-180" : ""}
               `}
-            />
-          )}
-        </button>
+              />
+            )}
+          </button>
 
-        {obrasAbierto && !collapsed && (
-          <div
-            className="
+          {obrasAbierto && (!collapsed || mobileOpen) && (
+            <div
+              className="
               ml-6
               space-y-1
             "
-          >
-            <Link
-              to="/dashboard/empleados"
-              className={claseSubItem(isSectionActive("/dashboard/empleados"))}
             >
-              <Users size={16} />
-              Empleados
-            </Link>
+              <Link
+                to="/dashboard/empleados"
+                className={claseSubItem(
+                  isSectionActive("/dashboard/empleados"),
+                )}
+              >
+                <Users size={16} />
+                Empleados
+              </Link>
 
-            <Link
-              to="/dashboard/obras"
-              className={claseSubItem(isSectionActive("/dashboard/obras"))}
-            >
-              <HardHat size={16} />
-              Obras
-            </Link>
+              <Link
+                to="/dashboard/obras"
+                className={claseSubItem(isSectionActive("/dashboard/obras"))}
+              >
+                <HardHat size={16} />
+                Obras
+              </Link>
 
-            <Link
-              to="/dashboard/control-diario"
-              className={claseSubItem(isActive("/dashboard/control-diario"))}
-            >
-              <ClipboardList size={16} />
-              Control Diario
-            </Link>
+              <Link
+                to="/dashboard/control-diario"
+                className={claseSubItem(isActive("/dashboard/control-diario"))}
+              >
+                <ClipboardList size={16} />
+                Control Diario
+              </Link>
 
-            <Link
-              to="/dashboard/asistencia"
-              className={claseSubItem(isSectionActive("/dashboard/asistencia"))}
-            >
-              <ClipboardCheck size={16} />
-              Asistencia
-            </Link>
+              <Link
+                to="/dashboard/asistencia"
+                className={claseSubItem(
+                  isSectionActive("/dashboard/asistencia"),
+                )}
+              >
+                <ClipboardCheck size={16} />
+                Asistencia
+              </Link>
 
-            <Link
-              to="/dashboard/gastos-obra"
-              className={claseSubItem(isActive("/dashboard/gastos-obra"))}
-            >
-              <Receipt size={16} />
-              Gastos Obra
-            </Link>
+              <Link
+                to="/dashboard/gastos-obra"
+                className={claseSubItem(isActive("/dashboard/gastos-obra"))}
+              >
+                <Receipt size={16} />
+                Gastos Obra
+              </Link>
 
-            <Link
-              to="/dashboard/reporte-gastos-obra"
-              className={claseSubItem(
-                isActive("/dashboard/reporte-gastos-obra"),
-              )}
-            >
-              <BarChart3 size={16} />
-              Reportes Obras
-            </Link>
-          </div>
-        )}
+              <Link
+                to="/dashboard/reporte-gastos-obra"
+                className={claseSubItem(
+                  isActive("/dashboard/reporte-gastos-obra"),
+                )}
+              >
+                <BarChart3 size={16} />
+                Reportes Obras
+              </Link>
+            </div>
+          )}
 
-        {/* =================================================
+          {/* =================================================
             FINANZAS
         ================================================= */}
 
-        <button
-          type="button"
-          onClick={() => setOpenFinanzas((prev) => !prev)}
-          className={claseBotonSeccion(finanzasAbierto)}
-        >
-          <span
-            className="
+          <button
+            type="button"
+            onClick={() => setOpenFinanzas((prev) => !prev)}
+            className={claseBotonSeccion(finanzasAbierto)}
+          >
+            <span
+              className="
               flex
               items-center
               gap-3
             "
-          >
-            <Landmark size={18} />
+            >
+              <Landmark size={18} />
 
-            {!collapsed && "Finanzas"}
-          </span>
+              {(!collapsed || mobileOpen) && "Finanzas"}
+            </span>
 
-          {!collapsed && (
-            <ChevronDown
-              size={16}
-              className={`
+            {(!collapsed || mobileOpen) && (
+              <ChevronDown
+                size={16}
+                className={`
                 transition
                 ${finanzasAbierto ? "rotate-180" : ""}
               `}
-            />
-          )}
-        </button>
+              />
+            )}
+          </button>
 
-        {finanzasAbierto && !collapsed && (
-          <div
-            className="
+          {finanzasAbierto && (!collapsed || mobileOpen) && (
+            <div
+              className="
               ml-6
               space-y-1
             "
-          >
-            <Link
-              to="/dashboard/dashboardfinanciero"
-              className={claseSubItem(
-                isActive("/dashboard/dashboardfinanciero"),
-              )}
             >
-              <LayoutDashboard size={16} />
-              Dashboard Financiero
-            </Link>
+              <Link
+                to="/dashboard/dashboardfinanciero"
+                className={claseSubItem(
+                  isActive("/dashboard/dashboardfinanciero"),
+                )}
+              >
+                <LayoutDashboard size={16} />
+                Dashboard Financiero
+              </Link>
 
-            <Link
-              to="/dashboard/cuentas"
-              className={claseSubItem(isActive("/dashboard/cuentas"))}
-            >
-              <Wallet size={16} />
-              Cuentas
-            </Link>
+              <Link
+                to="/dashboard/cuentas"
+                className={claseSubItem(isActive("/dashboard/cuentas"))}
+              >
+                <Wallet size={16} />
+                Cuentas
+              </Link>
 
-            <Link
-              to="/dashboard/ingresos"
-              className={claseSubItem(isActive("/dashboard/ingresos"))}
-            >
-              <DollarSign size={16} />
-              Ingresos
-            </Link>
+              <Link
+                to="/dashboard/ingresos"
+                className={claseSubItem(isActive("/dashboard/ingresos"))}
+              >
+                <DollarSign size={16} />
+                Ingresos
+              </Link>
 
-            <Link
-              to="/dashboard/egresos"
-              className={claseSubItem(isActive("/dashboard/egresos"))}
-            >
-              <Receipt size={16} />
-              Egresos
-            </Link>
+              <Link
+                to="/dashboard/egresos"
+                className={claseSubItem(isActive("/dashboard/egresos"))}
+              >
+                <Receipt size={16} />
+                Egresos
+              </Link>
 
-            <Link
-              to="/dashboard/transferencias"
-              className={claseSubItem(isActive("/dashboard/transferencias"))}
-            >
-              <ArrowLeftRight size={16} />
-              Transferencias
-            </Link>
+              <Link
+                to="/dashboard/transferencias"
+                className={claseSubItem(isActive("/dashboard/transferencias"))}
+              >
+                <ArrowLeftRight size={16} />
+                Transferencias
+              </Link>
 
-            <Link
-              to="/dashboard/flujo-de-caja"
-              className={claseSubItem(isActive("/dashboard/flujo-de-caja"))}
-            >
-              <TrendingUp size={16} />
-              Flujo Caja
-            </Link>
+              <Link
+                to="/dashboard/flujo-de-caja"
+                className={claseSubItem(isActive("/dashboard/flujo-de-caja"))}
+              >
+                <TrendingUp size={16} />
+                Flujo Caja
+              </Link>
 
-            <Link
-              to="/dashboard/utilidadmensual"
-              className={claseSubItem(isActive("/dashboard/utilidadmensual"))}
-            >
-              <BarChart3 size={16} />
-              Utilidad Mensual
-            </Link>
+              <Link
+                to="/dashboard/utilidadmensual"
+                className={claseSubItem(isActive("/dashboard/utilidadmensual"))}
+              >
+                <BarChart3 size={16} />
+                Utilidad Mensual
+              </Link>
 
-            <Link
-              to="/dashboard/cierres"
-              className={claseSubItem(isActive("/dashboard/cierres"))}
-            >
-              <CalendarDays size={16} />
-              Cierres
-            </Link>
+              <Link
+                to="/dashboard/cierres"
+                className={claseSubItem(isActive("/dashboard/cierres"))}
+              >
+                <CalendarDays size={16} />
+                Cierres
+              </Link>
 
-            <Link
-              to="/dashboard/periodos"
-              className={claseSubItem(isActive("/dashboard/periodos"))}
-            >
-              <Lock size={16} />
-              Periodos
-            </Link>
-          </div>
-        )}
+              <Link
+                to="/dashboard/periodos"
+                className={claseSubItem(isActive("/dashboard/periodos"))}
+              >
+                <Lock size={16} />
+                Periodos
+              </Link>
+            </div>
+          )}
 
-        {/* =================================================
+          {/* =================================================
             PERSONAL
         ================================================= */}
 
-        <button
-          type="button"
-          onClick={() => setOpenPersonal((prev) => !prev)}
-          className={claseBotonSeccion(personalAbierto)}
-        >
-          <span
-            className="
+          <button
+            type="button"
+            onClick={() => setOpenPersonal((prev) => !prev)}
+            className={claseBotonSeccion(personalAbierto)}
+          >
+            <span
+              className="
               flex
               items-center
               gap-3
             "
-          >
-            <Wallet size={18} />
+            >
+              <Wallet size={18} />
 
-            {!collapsed && "Personal"}
-          </span>
+              {(!collapsed || mobileOpen) && "Personal"}
+            </span>
 
-          {!collapsed && (
-            <ChevronDown
-              size={16}
-              className={`
+            {(!collapsed || mobileOpen) && (
+              <ChevronDown
+                size={16}
+                className={`
                 transition
                 ${personalAbierto ? "rotate-180" : ""}
               `}
-            />
-          )}
-        </button>
+              />
+            )}
+          </button>
 
-        {personalAbierto && !collapsed && (
-          <div
-            className="
+          {personalAbierto && (!collapsed || mobileOpen) && (
+            <div
+              className="
               ml-6
               space-y-1
             "
-          >
-            <Link
-              to="/dashboard/pagos-empleados"
-              className={claseSubItem(isActive("/dashboard/pagos-empleados"))}
             >
-              <Wallet size={16} />
-              Pagos Empleados
-            </Link>
+              <Link
+                to="/dashboard/pagos-empleados"
+                className={claseSubItem(isActive("/dashboard/pagos-empleados"))}
+              >
+                <Wallet size={16} />
+                Pagos Empleados
+              </Link>
 
-            <Link
-              to="/dashboard/reportes-empleados"
-              className={claseSubItem(
-                isActive("/dashboard/reportes-empleados"),
-              )}
-            >
-              <BarChart3 size={16} />
-              Reportes Personal
-            </Link>
-          </div>
-        )}
+              <Link
+                to="/dashboard/reportes-empleados"
+                className={claseSubItem(
+                  isActive("/dashboard/reportes-empleados"),
+                )}
+              >
+                <BarChart3 size={16} />
+                Reportes Personal
+              </Link>
+            </div>
+          )}
 
-        {/* =================================================
+          {/* =================================================
             ADMINISTRACIÓN DE SOCIOS
         ================================================= */}
 
-        {puedeAdministrarSocios && (
-          <>
-            {!collapsed && (
-              <div
-                className="
+          {puedeAdministrarSocios && (
+            <>
+              {(!collapsed || mobileOpen) && (
+                <div
+                  className="
                   pt-3
                   pb-1
                 "
-              >
-                <div
-                  className="
+                >
+                  <div
+                    className="
                     border-t
                     border-gray-700
                   "
-                />
+                  />
 
-                <p
-                  className="
+                  <p
+                    className="
                     mt-3
                     px-2
                     text-[11px]
@@ -944,101 +1014,101 @@ function Sidebar() {
                     text-gray-400
                     font-semibold
                   "
-                >
-                  Administración societaria
-                </p>
-              </div>
-            )}
+                  >
+                    Administración societaria
+                  </p>
+                </div>
+              )}
 
-            <button
-              type="button"
-              onClick={() => setOpenSocios((prev) => !prev)}
-              className={claseBotonSeccion(sociosAbierto)}
-            >
-              <span
-                className="
+              <button
+                type="button"
+                onClick={() => setOpenSocios((prev) => !prev)}
+                className={claseBotonSeccion(sociosAbierto)}
+              >
+                <span
+                  className="
                   flex
                   items-center
                   gap-3
                 "
-              >
-                <HandCoins size={18} />
+                >
+                  <HandCoins size={18} />
 
-                {!collapsed && "Socios"}
-              </span>
+                  {(!collapsed || mobileOpen) && "Socios"}
+                </span>
 
-              {!collapsed && (
-                <ChevronDown
-                  size={16}
-                  className={`
+                {(!collapsed || mobileOpen) && (
+                  <ChevronDown
+                    size={16}
+                    className={`
                     transition
                     ${sociosAbierto ? "rotate-180" : ""}
                   `}
-                />
-              )}
-            </button>
+                  />
+                )}
+              </button>
 
-            {sociosAbierto && !collapsed && (
-              <div
-                className="
+              {sociosAbierto && (!collapsed || mobileOpen) && (
+                <div
+                  className="
                   ml-6
                   space-y-1
                 "
-              >
-                <Link
-                  to="/dashboard/socios"
-                  className={claseSubItem(isActive("/dashboard/socios"))}
                 >
-                  <Users size={16} />
-                  Socios
-                </Link>
+                  <Link
+                    to="/dashboard/socios"
+                    className={claseSubItem(isActive("/dashboard/socios"))}
+                  >
+                    <Users size={16} />
+                    Socios
+                  </Link>
 
-                <Link
-                  to="/dashboard/socios/aportaciones"
-                  className={claseSubItem(
-                    isActive("/dashboard/socios/aportaciones"),
-                  )}
-                >
-                  <DollarSign size={16} />
-                  Aportes
-                </Link>
+                  <Link
+                    to="/dashboard/socios/aportaciones"
+                    className={claseSubItem(
+                      isActive("/dashboard/socios/aportaciones"),
+                    )}
+                  >
+                    <DollarSign size={16} />
+                    Aportes
+                  </Link>
 
-                <Link
-                  to="/dashboard/socios/utilidades"
-                  className={claseSubItem(
-                    isActive("/dashboard/socios/utilidades"),
-                  )}
-                >
-                  <TrendingUp size={16} />
-                  Utilidades
-                </Link>
-              </div>
-            )}
-          </>
-        )}
+                  <Link
+                    to="/dashboard/socios/utilidades"
+                    className={claseSubItem(
+                      isActive("/dashboard/socios/utilidades"),
+                    )}
+                  >
+                    <TrendingUp size={16} />
+                    Utilidades
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
 
-        {/* =================================================
+          {/* =================================================
             PORTAL PERSONAL DEL SOCIO
         ================================================= */}
 
-        {esSocio && (
-          <>
-            {!collapsed && (
-              <div
-                className="
+          {esSocio && (
+            <>
+              {(!collapsed || mobileOpen) && (
+                <div
+                  className="
                   pt-3
                   pb-1
                 "
-              >
-                <div
-                  className="
+                >
+                  <div
+                    className="
                     border-t
                     border-gray-700
                   "
-                />
+                  />
 
-                <p
-                  className="
+                  <p
+                    className="
                     mt-3
                     px-2
                     text-[11px]
@@ -1047,93 +1117,94 @@ function Sidebar() {
                     text-gray-400
                     font-semibold
                   "
-                >
-                  Mi información
-                </p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setOpenPortalSocio((prev) => !prev)}
-              title="Mi Portal"
-              className={claseBotonSeccion(
-                isSectionActive("/dashboard/mi-portal"),
+                  >
+                    Mi información
+                  </p>
+                </div>
               )}
-            >
-              <span
-                className="
+
+              <button
+                type="button"
+                onClick={() => setOpenPortalSocio((prev) => !prev)}
+                title="Mi Portal"
+                className={claseBotonSeccion(
+                  isSectionActive("/dashboard/mi-portal"),
+                )}
+              >
+                <span
+                  className="
                   flex
                   items-center
                   gap-3
                 "
-              >
-                <UserCircle size={18} />
+                >
+                  <UserCircle size={18} />
 
-                {!collapsed && "Mi Portal"}
-              </span>
+                  {(!collapsed || mobileOpen) && "Mi Portal"}
+                </span>
 
-              {!collapsed && (
-                <ChevronDown
-                  size={16}
-                  className={`
+                {(!collapsed || mobileOpen) && (
+                  <ChevronDown
+                    size={16}
+                    className={`
                     transition
                     ${portalSocioAbierto ? "rotate-180" : ""}
                   `}
-                />
-              )}
-            </button>
+                  />
+                )}
+              </button>
 
-            {portalSocioAbierto && !collapsed && (
-              <div
-                className="
+              {portalSocioAbierto && (!collapsed || mobileOpen) && (
+                <div
+                  className="
                   ml-6
                   space-y-1
                 "
-              >
-                <Link
-                  to="/dashboard/mi-portal"
-                  className={claseSubItem(isActive("/dashboard/mi-portal"))}
                 >
-                  <LayoutDashboard size={16} />
-                  Resumen
-                </Link>
+                  <Link
+                    to="/dashboard/mi-portal"
+                    className={claseSubItem(isActive("/dashboard/mi-portal"))}
+                  >
+                    <LayoutDashboard size={16} />
+                    Resumen
+                  </Link>
 
-                <Link
-                  to="/dashboard/mi-portal/perfil"
-                  className={claseSubItem(
-                    isActive("/dashboard/mi-portal/perfil"),
-                  )}
-                >
-                  <UserCircle size={16} />
-                  Mi Perfil
-                </Link>
+                  <Link
+                    to="/dashboard/mi-portal/perfil"
+                    className={claseSubItem(
+                      isActive("/dashboard/mi-portal/perfil"),
+                    )}
+                  >
+                    <UserCircle size={16} />
+                    Mi Perfil
+                  </Link>
 
-                <Link
-                  to="/dashboard/mi-portal/aportes"
-                  className={claseSubItem(
-                    isActive("/dashboard/mi-portal/aportes"),
-                  )}
-                >
-                  <PiggyBank size={16} />
-                  Mis Aportes
-                </Link>
+                  <Link
+                    to="/dashboard/mi-portal/aportes"
+                    className={claseSubItem(
+                      isActive("/dashboard/mi-portal/aportes"),
+                    )}
+                  >
+                    <PiggyBank size={16} />
+                    Mis Aportes
+                  </Link>
 
-                <Link
-                  to="/dashboard/mi-portal/utilidades"
-                  className={claseSubItem(
-                    isActive("/dashboard/mi-portal/utilidades"),
-                  )}
-                >
-                  <TrendingUp size={16} />
-                  Mis Utilidades
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </nav>
-    </aside>
+                  <Link
+                    to="/dashboard/mi-portal/utilidades"
+                    className={claseSubItem(
+                      isActive("/dashboard/mi-portal/utilidades"),
+                    )}
+                  >
+                    <TrendingUp size={16} />
+                    Mis Utilidades
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </nav>
+      </aside>
+    </>
   );
 }
 

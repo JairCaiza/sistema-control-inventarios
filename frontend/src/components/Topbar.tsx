@@ -1,11 +1,15 @@
-import { Search, Bell, Settings, LogOut, ChevronRight } from "lucide-react";
+import {
+  Search,
+  Bell,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Menu,
+} from "lucide-react";
 
 import { useLocation, useNavigate } from "react-router-dom";
-
 import { useEffect, useState } from "react";
-
 import Swal from "sweetalert2";
-
 import { logout } from "../services/authService";
 
 /* =====================================================
@@ -29,7 +33,6 @@ interface UsuarioSesion {
 
   roles?: RolUsuario[];
 
-  // Compatibilidad con estructura antigua
   rol?: RolUsuario;
   role?: RolUsuario;
 }
@@ -53,14 +56,14 @@ interface BreadcrumbItem {
   label: string;
 }
 
+interface TopbarProps {
+  onOpenMobileMenu: () => void;
+}
+
 /* =====================================================
    HELPERS DE USUARIO
 ===================================================== */
 
-/**
- * Convierte cualquier estructura de rol
- * a un nombre legible.
- */
 const obtenerNombreRol = (rol: RolUsuario | null | undefined): string => {
   if (!rol) {
     return "";
@@ -73,17 +76,6 @@ const obtenerNombreRol = (rol: RolUsuario | null | undefined): string => {
   return String(rol.nombre ?? rol.name ?? rol.rol ?? rol.role ?? "").trim();
 };
 
-/**
- * Obtiene todos los roles del usuario.
- *
- * Soporta:
- *
- * roles: ["Operador", "Socio"]
- *
- * rol: "Administrador"
- *
- * role: "Contador"
- */
 const obtenerRolesUsuario = (usuario: UsuarioSesion | null): string[] => {
   if (!usuario) {
     return [];
@@ -102,14 +94,6 @@ const obtenerRolesUsuario = (usuario: UsuarioSesion | null): string[] => {
   return [...new Set(rolesOriginales.map(obtenerNombreRol).filter(Boolean))];
 };
 
-/**
- * Lee correctamente el usuario guardado
- * por el login.
- *
- * Nuestro sistema utiliza:
- *
- * localStorage.setItem("usuario", ...)
- */
 const leerUsuarioLocalStorage = (): UsuarioSesion | null => {
   try {
     const usuarioGuardado = localStorage.getItem("usuario");
@@ -120,26 +104,6 @@ const leerUsuarioLocalStorage = (): UsuarioSesion | null => {
 
     const parsed: UsuarioAlmacenado = JSON.parse(usuarioGuardado);
 
-    /*
-     * Soporta cualquiera de estas estructuras:
-     *
-     * {
-     *   id,
-     *   nombre,
-     *   apellido,
-     *   correo,
-     *   roles
-     * }
-     *
-     * o:
-     *
-     * {
-     *   usuario: {
-     *      ...
-     *   }
-     * }
-     */
-
     return parsed.usuario ?? parsed.user ?? parsed;
   } catch (error) {
     console.error("Error al recuperar usuario del localStorage:", error);
@@ -148,23 +112,15 @@ const leerUsuarioLocalStorage = (): UsuarioSesion | null => {
   }
 };
 
-/**
- * Genera las dos iniciales.
- *
- * Patricio Caiza -> PC
- * Jairo Caiza -> JC
- */
 const obtenerIniciales = (usuario: UsuarioSesion | null): string => {
   if (!usuario) {
     return "U";
   }
 
   const nombre = usuario.nombre?.trim() ?? "";
-
   const apellido = usuario.apellido?.trim() ?? "";
 
   const inicialNombre = nombre.charAt(0).toUpperCase();
-
   const inicialApellido = apellido.charAt(0).toUpperCase();
 
   const iniciales = `${inicialNombre}${inicialApellido}`;
@@ -182,9 +138,9 @@ const obtenerNavegacion = (
   titulo: string;
   breadcrumbs: BreadcrumbItem[];
 } => {
-  /* =================================================
-     PORTAL DEL SOCIO
-  ================================================= */
+  /* =========================
+     PORTAL SOCIO
+  ========================= */
 
   if (
     pathname === "/dashboard/mi-portal" ||
@@ -192,476 +148,271 @@ const obtenerNavegacion = (
   ) {
     return {
       titulo: "Mi Portal",
-      breadcrumbs: [
-        {
-          label: "Mi Portal",
-        },
-        {
-          label: "Resumen",
-        },
-      ],
+      breadcrumbs: [{ label: "Mi Portal" }, { label: "Resumen" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/mi-portal/perfil")) {
     return {
       titulo: "Mi Perfil",
-      breadcrumbs: [
-        {
-          label: "Mi Portal",
-        },
-        {
-          label: "Mi Perfil",
-        },
-      ],
+      breadcrumbs: [{ label: "Mi Portal" }, { label: "Mi Perfil" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/mi-portal/aportes")) {
     return {
       titulo: "Mis Aportes",
-      breadcrumbs: [
-        {
-          label: "Mi Portal",
-        },
-        {
-          label: "Mis Aportes",
-        },
-      ],
+      breadcrumbs: [{ label: "Mi Portal" }, { label: "Mis Aportes" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/mi-portal/utilidades")) {
     return {
       titulo: "Mis Utilidades",
-      breadcrumbs: [
-        {
-          label: "Mi Portal",
-        },
-        {
-          label: "Mis Utilidades",
-        },
-      ],
+      breadcrumbs: [{ label: "Mi Portal" }, { label: "Mis Utilidades" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      DASHBOARD
-  ================================================= */
+  ========================= */
 
   if (pathname === "/dashboard" || pathname === "/dashboard/") {
     return {
       titulo: "Dashboard General",
-      breadcrumbs: [
-        {
-          label: "Dashboard",
-        },
-      ],
+      breadcrumbs: [{ label: "Dashboard" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      ADMINISTRACIÓN
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/usuarios")) {
     return {
       titulo: "Gestión de Usuarios",
-      breadcrumbs: [
-        {
-          label: "Administración",
-        },
-        {
-          label: "Usuarios",
-        },
-      ],
+      breadcrumbs: [{ label: "Administración" }, { label: "Usuarios" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/roles")) {
     return {
       titulo: "Gestión de Roles",
-      breadcrumbs: [
-        {
-          label: "Administración",
-        },
-        {
-          label: "Roles",
-        },
-      ],
+      breadcrumbs: [{ label: "Administración" }, { label: "Roles" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      INVENTARIO
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/categorias")) {
     return {
       titulo: "Categorías",
-      breadcrumbs: [
-        {
-          label: "Inventario",
-        },
-        {
-          label: "Categorías",
-        },
-      ],
+      breadcrumbs: [{ label: "Inventario" }, { label: "Categorías" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/ubicaciones")) {
     return {
       titulo: "Ubicaciones",
-      breadcrumbs: [
-        {
-          label: "Inventario",
-        },
-        {
-          label: "Ubicaciones",
-        },
-      ],
+      breadcrumbs: [{ label: "Inventario" }, { label: "Ubicaciones" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/activos")) {
     return {
       titulo: "Gestión de Activos",
-      breadcrumbs: [
-        {
-          label: "Inventario",
-        },
-        {
-          label: "Activos",
-        },
-      ],
+      breadcrumbs: [{ label: "Inventario" }, { label: "Activos" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/movimientos")) {
     return {
       titulo: "Movimientos de Inventario",
-      breadcrumbs: [
-        {
-          label: "Inventario",
-        },
-        {
-          label: "Movimientos",
-        },
-      ],
+      breadcrumbs: [{ label: "Inventario" }, { label: "Movimientos" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/reportes")) {
     return {
       titulo: "Reportes de Inventario",
-      breadcrumbs: [
-        {
-          label: "Inventario",
-        },
-        {
-          label: "Reportes",
-        },
-      ],
+      breadcrumbs: [{ label: "Inventario" }, { label: "Reportes" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      CLIENTES
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/clientes")) {
     return {
       titulo: "Gestión de Clientes",
-      breadcrumbs: [
-        {
-          label: "Clientes",
-        },
-      ],
+      breadcrumbs: [{ label: "Clientes" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      CONTRATOS
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/contratos")) {
     return {
       titulo: "Gestión de Contratos",
-      breadcrumbs: [
-        {
-          label: "Contratos",
-        },
-      ],
+      breadcrumbs: [{ label: "Contratos" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      DEVOLUCIONES
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/devoluciones")) {
     return {
       titulo: "Gestión de Devoluciones",
-      breadcrumbs: [
-        {
-          label: "Devoluciones",
-        },
-      ],
+      breadcrumbs: [{ label: "Devoluciones" }],
     };
   }
 
-  /* =================================================
-     GESTIÓN DE OBRAS
-  ================================================= */
+  /* =========================
+     OBRAS
+  ========================= */
 
   if (pathname.startsWith("/dashboard/obras")) {
     return {
       titulo: "Gestión de Obras",
-      breadcrumbs: [
-        {
-          label: "Gestión de Obras",
-        },
-        {
-          label: "Obras",
-        },
-      ],
+      breadcrumbs: [{ label: "Gestión de Obras" }, { label: "Obras" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/control-diario")) {
     return {
       titulo: "Control Diario",
-      breadcrumbs: [
-        {
-          label: "Gestión de Obras",
-        },
-        {
-          label: "Control Diario",
-        },
-      ],
+      breadcrumbs: [{ label: "Gestión de Obras" }, { label: "Control Diario" }],
+    };
+  }
+
+  if (pathname.startsWith("/dashboard/asistencia")) {
+    return {
+      titulo: "Asistencia",
+      breadcrumbs: [{ label: "Gestión de Obras" }, { label: "Asistencia" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/gastos-obra")) {
     return {
       titulo: "Gastos de Obra",
-      breadcrumbs: [
-        {
-          label: "Gestión de Obras",
-        },
-        {
-          label: "Gastos de Obra",
-        },
-      ],
+      breadcrumbs: [{ label: "Gestión de Obras" }, { label: "Gastos de Obra" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/reporte-gastos-obra")) {
     return {
       titulo: "Reportes de Obras",
-      breadcrumbs: [
-        {
-          label: "Gestión de Obras",
-        },
-        {
-          label: "Reportes",
-        },
-      ],
+      breadcrumbs: [{ label: "Gestión de Obras" }, { label: "Reportes" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      FINANZAS
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/dashboardfinanciero")) {
     return {
       titulo: "Dashboard Financiero",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Dashboard",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Dashboard" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/cuentas")) {
     return {
       titulo: "Cuentas Financieras",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Cuentas",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Cuentas" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/ingresos")) {
     return {
       titulo: "Gestión de Ingresos",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Ingresos",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Ingresos" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/egresos")) {
     return {
       titulo: "Gestión de Egresos",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Egresos",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Egresos" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/transferencias")) {
     return {
       titulo: "Transferencias",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Transferencias",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Transferencias" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/flujo-de-caja")) {
     return {
       titulo: "Flujo de Caja",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Flujo de Caja",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Flujo de Caja" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/utilidadmensual")) {
     return {
       titulo: "Utilidad Mensual",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Utilidad Mensual",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Utilidad Mensual" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/cierres")) {
     return {
       titulo: "Cierres de Caja",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Cierres",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Cierres" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/periodos")) {
     return {
       titulo: "Períodos Contables",
-      breadcrumbs: [
-        {
-          label: "Finanzas",
-        },
-        {
-          label: "Períodos",
-        },
-      ],
+      breadcrumbs: [{ label: "Finanzas" }, { label: "Períodos" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      PERSONAL
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/empleados")) {
     return {
       titulo: "Gestión de Personal",
-      breadcrumbs: [
-        {
-          label: "Personal",
-        },
-        {
-          label: "Empleados",
-        },
-      ],
+      breadcrumbs: [{ label: "Personal" }, { label: "Empleados" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/pagos-empleados")) {
     return {
       titulo: "Pagos a Empleados",
-      breadcrumbs: [
-        {
-          label: "Personal",
-        },
-        {
-          label: "Pagos",
-        },
-      ],
+      breadcrumbs: [{ label: "Personal" }, { label: "Pagos" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/reportes-empleados")) {
     return {
       titulo: "Reportes de Personal",
-      breadcrumbs: [
-        {
-          label: "Personal",
-        },
-        {
-          label: "Reportes",
-        },
-      ],
+      breadcrumbs: [{ label: "Personal" }, { label: "Reportes" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      SOCIOS
-  ================================================= */
+  ========================= */
 
   if (pathname.startsWith("/dashboard/socios/utilidades")) {
     return {
       titulo: "Utilidades de Socios",
-      breadcrumbs: [
-        {
-          label: "Socios",
-        },
-        {
-          label: "Utilidades",
-        },
-      ],
+      breadcrumbs: [{ label: "Socios" }, { label: "Utilidades" }],
     };
   }
 
@@ -671,42 +422,24 @@ const obtenerNavegacion = (
   ) {
     return {
       titulo: "Aportes de Socios",
-      breadcrumbs: [
-        {
-          label: "Socios",
-        },
-        {
-          label: "Aportes",
-        },
-      ],
+      breadcrumbs: [{ label: "Socios" }, { label: "Aportes" }],
     };
   }
 
   if (pathname.startsWith("/dashboard/socios")) {
     return {
       titulo: "Gestión de Socios",
-      breadcrumbs: [
-        {
-          label: "Socios",
-        },
-        {
-          label: "Gestión de Socios",
-        },
-      ],
+      breadcrumbs: [{ label: "Socios" }, { label: "Gestión de Socios" }],
     };
   }
 
-  /* =================================================
+  /* =========================
      FALLBACK
-  ================================================= */
+  ========================= */
 
   return {
     titulo: "Sistema de Gestión",
-    breadcrumbs: [
-      {
-        label: "Dashboard",
-      },
-    ],
+    breadcrumbs: [{ label: "Dashboard" }],
   };
 };
 
@@ -714,14 +447,9 @@ const obtenerNavegacion = (
    TOPBAR
 ===================================================== */
 
-function Topbar() {
+function Topbar({ onOpenMobileMenu }: TopbarProps) {
   const navigate = useNavigate();
-
   const location = useLocation();
-
-  /* =====================================================
-     NAVEGACIÓN ACTUAL
-  ===================================================== */
 
   const navegacion = obtenerNavegacion(location.pathname);
 
@@ -733,12 +461,6 @@ function Topbar() {
     leerUsuarioLocalStorage(),
   );
 
-  /*
-   * Solamente actualizamos desde eventos externos.
-   *
-   * No hacemos setState directamente en el cuerpo
-   * inicial de un useEffect.
-   */
   useEffect(() => {
     const actualizarUsuario = () => {
       setUsuario(leerUsuarioLocalStorage());
@@ -774,7 +496,7 @@ function Topbar() {
   }, []);
 
   /* =====================================================
-     INFORMACIÓN VISUAL DEL USUARIO
+     INFORMACIÓN DEL USUARIO
   ===================================================== */
 
   const roles = obtenerRolesUsuario(usuario);
@@ -796,17 +518,11 @@ function Topbar() {
   const handleLogout = async () => {
     const result = await Swal.fire({
       title: "¿Cerrar sesión?",
-
       text: "Tendrá que iniciar sesión nuevamente para acceder al sistema.",
-
       icon: "question",
-
       showCancelButton: true,
-
       confirmButtonText: "Sí, cerrar sesión",
-
       cancelButtonText: "Cancelar",
-
       confirmButtonColor: "#dc2626",
     });
 
@@ -828,15 +544,18 @@ function Topbar() {
   return (
     <header
       className="
-        h-16
+        min-h-16
         bg-white
         border-b
         border-[var(--color-border)]
         flex
         items-center
         justify-between
-        px-6
+        px-2
+        sm:px-4
+        lg:px-6
         shadow-sm
+        gap-2
       "
     >
       {/* =================================================
@@ -846,74 +565,126 @@ function Topbar() {
       <div
         className="
           flex
-          flex-col
-          justify-center
-          min-w-[280px]
+          min-w-0
+          flex-1
+          items-center
+          gap-2
+          lg:flex-none
         "
       >
-        {/* BREADCRUMB */}
+        {/* BOTÓN MENÚ MÓVIL */}
+
+        <button
+          type="button"
+          onClick={onOpenMobileMenu}
+          className="
+            lg:hidden
+            flex
+            h-10
+            w-10
+            min-w-10
+            items-center
+            justify-center
+            rounded-lg
+            text-gray-700
+            hover:bg-gray-100
+            transition
+          "
+          aria-label="Abrir menú"
+          title="Menú"
+        >
+          <Menu size={23} />
+        </button>
+
+        {/* TÍTULO Y BREADCRUMB */}
 
         <div
           className="
             flex
-            items-center
-            text-xs
-            text-gray-500
+            min-w-0
+            flex-1
+            flex-col
+            justify-center
+            lg:min-w-[280px]
+            lg:flex-none
           "
         >
-          <span
+          {/* BREADCRUMB */}
+
+          <div
             className="
-              hover:text-[var(--color-primary)]
-              cursor-pointer
-              transition
+              hidden
+              sm:flex
+              items-center
+              text-xs
+              text-gray-500
+              whitespace-nowrap
+              overflow-hidden
             "
-            onClick={() => navigate("/dashboard")}
           >
-            Dashboard
-          </span>
+            <span
+              className="
+                hover:text-[var(--color-primary)]
+                cursor-pointer
+                transition
+              "
+              onClick={() => navigate("/dashboard")}
+            >
+              Dashboard
+            </span>
 
-          {navegacion.breadcrumbs
-            .filter((item) => item.label !== "Dashboard")
-            .map((item, index, array) => (
-              <div
-                key={`${item.label}-${index}`}
-                className="
-                    flex
-                    items-center
-                  "
-              >
-                <ChevronRight
-                  size={13}
+            {navegacion.breadcrumbs
+              .filter((item) => item.label !== "Dashboard")
+              .map((item, index, array) => (
+                <div
+                  key={`${item.label}-${index}`}
                   className="
-                      mx-1
-                      text-gray-400
+                      flex
+                      items-center
+                      min-w-0
                     "
-                />
-
-                <span
-                  className={
-                    index === array.length - 1
-                      ? "font-medium text-gray-700"
-                      : ""
-                  }
                 >
-                  {item.label}
-                </span>
-              </div>
-            ))}
+                  <ChevronRight
+                    size={13}
+                    className="
+                        mx-1
+                        text-gray-400
+                        flex-shrink-0
+                      "
+                  />
+
+                  <span
+                    className={`
+                        truncate
+                        ${
+                          index === array.length - 1
+                            ? "font-medium text-gray-700"
+                            : ""
+                        }
+                      `}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+          </div>
+
+          {/* TÍTULO */}
+
+          <h1
+            className="
+              truncate
+              text-sm
+              sm:text-base
+              lg:text-lg
+              font-bold
+              text-[var(--text-primary)]
+            "
+            title={navegacion.titulo}
+          >
+            {navegacion.titulo}
+          </h1>
         </div>
-
-        {/* TÍTULO */}
-
-        <h1
-          className="
-            text-lg
-            font-bold
-            text-[var(--text-primary)]
-          "
-        >
-          {navegacion.titulo}
-        </h1>
       </div>
 
       {/* =================================================
@@ -949,9 +720,7 @@ function Topbar() {
 
           <input
             type="text"
-            placeholder="
-              Buscar activos, clientes, obras, empleados...
-            "
+            placeholder="Buscar activos, clientes, obras, empleados..."
             className="
               w-full
               pl-10
@@ -975,8 +744,11 @@ function Topbar() {
       <div
         className="
           flex
+          flex-shrink-0
           items-center
-          gap-4
+          gap-1
+          sm:gap-2
+          lg:gap-4
         "
       >
         {/* PERÍODO */}
@@ -988,23 +760,9 @@ function Topbar() {
             text-right
           "
         >
-          <p
-            className="
-              text-xs
-              text-gray-500
-            "
-          >
-            Período Activo
-          </p>
+          <p className="text-xs text-gray-500">Período Activo</p>
 
-          <p
-            className="
-              font-semibold
-              text-sm
-            "
-          >
-            Junio 2026
-          </p>
+          <p className="font-semibold text-sm">Junio 2026</p>
         </div>
 
         {/* NOTIFICACIONES */}
@@ -1019,6 +777,7 @@ function Topbar() {
             transition
           "
           title="Notificaciones"
+          aria-label="Notificaciones"
         >
           <Bell size={20} />
 
@@ -1047,32 +806,32 @@ function Topbar() {
         <button
           type="button"
           className="
+            hidden
+            sm:flex
             p-2
             rounded-lg
             hover:bg-gray-100
             transition
           "
           title="Configuración"
+          aria-label="Configuración"
         >
           <Settings size={20} />
         </button>
 
-        {/* =================================================
-            USUARIO AUTENTICADO
-        ================================================= */}
+        {/* USUARIO */}
 
         <div
           className="
             flex
             items-center
-            gap-3
+            gap-2
+            lg:gap-3
           "
           title={
             nombreCompleto ? `${nombreCompleto} - ${textoRoles}` : textoRoles
           }
         >
-          {/* INFORMACIÓN */}
-
           <div
             className="
               text-right
@@ -1081,8 +840,6 @@ function Topbar() {
               max-w-[230px]
             "
           >
-            {/* CORREO */}
-
             <p
               className="
                 text-sm
@@ -1094,8 +851,6 @@ function Topbar() {
             >
               {correoUsuario}
             </p>
-
-            {/* ROLES */}
 
             <p
               className="
@@ -1113,9 +868,12 @@ function Topbar() {
 
           <div
             className="
-              w-10
-              h-10
-              min-w-10
+              w-9
+              h-9
+              sm:w-10
+              sm:h-10
+              min-w-9
+              sm:min-w-10
               bg-[var(--color-primary)]
               text-white
               flex
@@ -1145,6 +903,7 @@ function Topbar() {
             transition
           "
           title="Cerrar sesión"
+          aria-label="Cerrar sesión"
         >
           <LogOut size={20} />
         </button>
