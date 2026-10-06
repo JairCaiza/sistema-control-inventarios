@@ -439,17 +439,16 @@ function EditObraModal({ open, onClose, onUpdated, obra }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !loading) {
           onClose();
         }
       }}
     >
-      <div className="my-6 w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+      <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         {/* HEADER */}
-
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
               Gestión de Obras
@@ -475,246 +474,239 @@ function EditObraModal({ open, onClose, onUpdated, obra }: Props) {
           </button>
         </div>
 
-        {/* FORM */}
+        {/* =====================================================
+          SCROLL VERTICAL DEL MODAL
+      ===================================================== */}
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-5 p-6 md:grid-cols-2">
-            {/* CÓDIGO */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Código
-                <span className="ml-1 text-rose-500">*</span>
-              </label>
-
-              <input
-                type="text"
-                name="codigo"
-                value={form.codigo}
-                onChange={handleChange}
-                maxLength={30}
-                disabled={loading}
-                placeholder="Ej. OB-001"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              />
-            </div>
-
-            {/* NOMBRE */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Nombre de la obra
-                <span className="ml-1 text-rose-500">*</span>
-              </label>
-
-              <input
-                type="text"
-                name="nombre"
-                value={form.nombre}
-                onChange={handleChange}
-                maxLength={150}
-                disabled={loading}
-                placeholder="Nombre de la obra"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              />
-            </div>
-
-            {/* CLIENTE */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Cliente
-              </label>
-
-              <select
-                name="cliente_id"
-                value={form.cliente_id}
-                onChange={handleChange}
-                disabled={loading || cargandoClientes}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              >
-                <option value="">
-                  {cargandoClientes
-                    ? "Cargando clientes..."
-                    : "Sin cliente asignado"}
-                </option>
-
-                {clientes.map((cliente) => (
-                  <option key={cliente.id} value={cliente.id}>
-                    {obtenerNombreCliente(cliente)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* UBICACIÓN */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Ubicación
-              </label>
-
-              <input
-                type="text"
-                name="ubicacion"
-                value={form.ubicacion}
-                onChange={handleChange}
-                disabled={loading}
-                placeholder="Ej. Riobamba, Chimborazo"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              />
-            </div>
-
-            {/* FECHA INICIO */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Fecha de inicio
-              </label>
-
-              <input
-                type="date"
-                name="fecha_inicio"
-                value={form.fecha_inicio}
-                onChange={handleChange}
-                disabled={loading}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              />
-            </div>
-
-            {/* FECHA FIN */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Fecha de finalización
-              </label>
-
-              <input
-                type="date"
-                name="fecha_fin"
-                value={form.fecha_fin}
-                min={form.fecha_inicio || undefined}
-                onChange={handleChange}
-                disabled={loading}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              />
-            </div>
-
-            {/* PRESUPUESTO */}
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Presupuesto
-              </label>
-
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-slate-400">
-                  $
-                </span>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-5 p-6 md:grid-cols-2">
+              {/* CÓDIGO */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Código
+                  <span className="ml-1 text-rose-500">*</span>
+                </label>
 
                 <input
-                  type="number"
-                  name="presupuesto"
-                  value={form.presupuesto}
+                  type="text"
+                  name="codigo"
+                  value={form.codigo}
                   onChange={handleChange}
-                  min="0"
-                  step="0.01"
+                  maxLength={30}
                   disabled={loading}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-8 pr-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                  placeholder="Ej. OB-001"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
                 />
               </div>
-            </div>
 
-            {/* ESTADO */}
+              {/* NOMBRE */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Nombre de la obra
+                  <span className="ml-1 text-rose-500">*</span>
+                </label>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Estado
-              </label>
+                <input
+                  type="text"
+                  name="nombre"
+                  value={form.nombre}
+                  onChange={handleChange}
+                  maxLength={150}
+                  disabled={loading}
+                  placeholder="Nombre de la obra"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                />
+              </div>
 
-              <select
-                name="estado"
-                value={form.estado}
-                onChange={handleChange}
-                disabled={loading}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              >
-                {ESTADOS.map((estado) => (
-                  <option key={estado.value} value={estado.value}>
-                    {estado.label}
+              {/* CLIENTE */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Cliente
+                </label>
+
+                <select
+                  name="cliente_id"
+                  value={form.cliente_id}
+                  onChange={handleChange}
+                  disabled={loading || cargandoClientes}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {cargandoClientes
+                      ? "Cargando clientes..."
+                      : "Sin cliente asignado"}
                   </option>
-                ))}
-              </select>
-            </div>
 
-            {/* DESCRIPCIÓN */}
+                  {clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {obtenerNombreCliente(cliente)}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                Descripción
-              </label>
+              {/* UBICACIÓN */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Ubicación
+                </label>
 
-              <textarea
-                name="descripcion"
-                value={form.descripcion}
-                onChange={handleChange}
-                maxLength={2000}
-                rows={4}
-                disabled={loading}
-                placeholder="Descripción general, alcance u observaciones de la obra..."
-                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
-              />
+                <input
+                  type="text"
+                  name="ubicacion"
+                  value={form.ubicacion}
+                  onChange={handleChange}
+                  disabled={loading}
+                  placeholder="Ej. Riobamba, Chimborazo"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                />
+              </div>
 
-              <div className="mt-1 flex justify-end">
-                <span className="text-xs text-slate-400">
-                  {form.descripcion.length}
-                  /2000
-                </span>
+              {/* FECHA INICIO */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Fecha de inicio
+                </label>
+
+                <input
+                  type="date"
+                  name="fecha_inicio"
+                  value={form.fecha_inicio}
+                  onChange={handleChange}
+                  disabled={loading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                />
+              </div>
+
+              {/* FECHA FIN */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Fecha de finalización
+                </label>
+
+                <input
+                  type="date"
+                  name="fecha_fin"
+                  value={form.fecha_fin}
+                  min={form.fecha_inicio || undefined}
+                  onChange={handleChange}
+                  disabled={loading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                />
+              </div>
+
+              {/* PRESUPUESTO */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Presupuesto
+                </label>
+
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-slate-400">
+                    $
+                  </span>
+
+                  <input
+                    type="number"
+                    name="presupuesto"
+                    value={form.presupuesto}
+                    onChange={handleChange}
+                    min="0"
+                    step="0.01"
+                    disabled={loading}
+                    placeholder="0.00"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-8 pr-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                  />
+                </div>
+              </div>
+
+              {/* ESTADO */}
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Estado
+                </label>
+
+                <select
+                  name="estado"
+                  value={form.estado}
+                  onChange={handleChange}
+                  disabled={loading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                >
+                  {ESTADOS.map((estado) => (
+                    <option key={estado.value} value={estado.value}>
+                      {estado.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* DESCRIPCIÓN */}
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Descripción
+                </label>
+
+                <textarea
+                  name="descripcion"
+                  value={form.descripcion}
+                  onChange={handleChange}
+                  maxLength={2000}
+                  rows={4}
+                  disabled={loading}
+                  placeholder="Descripción general, alcance u observaciones de la obra..."
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                />
+
+                <div className="mt-1 flex justify-end">
+                  <span className="text-xs text-slate-400">
+                    {form.descripcion.length}/2000
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* INFORMACIÓN */}
+            {/* INFORMACIÓN */}
+            <div className="mx-6 mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-semibold text-sky-900">
+                Información importante
+              </p>
 
-          <div className="mx-6 mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-            <p className="text-sm font-semibold text-sky-900">
-              Información importante
-            </p>
+              <p className="mt-1 text-sm leading-6 text-sky-800">
+                Si la obra ya tiene gastos, pagos, controles diarios o
+                movimientos financieros, el historial se conserva. Para una obra
+                que ya no debe continuar, utiliza el estado{" "}
+                <strong>Cancelada</strong> en lugar de eliminar su información
+                histórica.
+              </p>
+            </div>
 
-            <p className="mt-1 text-sm leading-6 text-sky-800">
-              Si la obra ya tiene gastos, pagos, controles diarios o movimientos
-              financieros, el historial se conserva. Para una obra que ya no
-              debe continuar, utiliza el estado <strong>Cancelada</strong> en
-              lugar de eliminar su información histórica.
-            </p>
-          </div>
+            {/* FOOTER */}
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancelar
+              </button>
 
-          {/* FOOTER */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading && (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                )}
 
-          <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading && (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              )}
-
-              {loading ? "Actualizando..." : "Guardar cambios"}
-            </button>
-          </div>
-        </form>
+                {loading ? "Actualizando..." : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

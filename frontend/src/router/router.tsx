@@ -40,8 +40,6 @@ import EgresosPage from "../modules/finanzas/egresos/pages/EgresosPage";
 import TransferenciasPage from "../modules/finanzas/transferencias/pages/TransferenciasPage";
 import FlujoCajaPage from "../modules/finanzas/flujocaja/pages/FlujoCajaPage";
 import UtilidadMensualPage from "../modules/finanzas/utilidad/pages/UtilidadMensualPage";
-import CierresPage from "../modules/finanzas/cierres/pages/CierresPages";
-import PeriodoPage from "../modules/finanzas/periodos/pages/PeriodoPage";
 
 import SociosPage from "../modules/socios/pages/SociosPages";
 import AportesSocios from "../modules/socios/pages/AporteSocios";
@@ -258,16 +256,6 @@ export const router = createBrowserRouter([
           {
             path: "utilidadmensual",
             element: <UtilidadMensualPage />,
-          },
-
-          {
-            path: "cierres",
-            element: <CierresPage />,
-          },
-
-          {
-            path: "periodos",
-            element: <PeriodoPage />,
           },
 
           /* =================================================

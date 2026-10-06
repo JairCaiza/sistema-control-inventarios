@@ -24,11 +24,8 @@ import {
 
 interface Props {
   open: boolean;
-
   onClose: () => void;
-
   activo: Activo | null;
-
   onUpdated: () => void;
 }
 
@@ -309,9 +306,7 @@ function UpdateEstadoActivoModal({ open, onClose, activo, onUpdated }: Props) {
     if (errorValidacion) {
       await Swal.fire({
         icon: "warning",
-
         title: "Revise la información",
-
         text: errorValidacion,
       });
 
@@ -330,37 +325,37 @@ function UpdateEstadoActivoModal({ open, onClose, activo, onUpdated }: Props) {
       title: "Confirmar cambio de estado",
 
       html: `
-          <div style="text-align:left; line-height:1.7">
+        <div style="text-align:left; line-height:1.7">
 
-            <p>
-              <strong>Activo:</strong>
-              ${activo.nombre}
-            </p>
+          <p>
+            <strong>Activo:</strong>
+            ${activo.nombre}
+          </p>
 
-            <p>
-              <strong>Código:</strong>
-              ${activo.codigo}
-            </p>
+          <p>
+            <strong>Código:</strong>
+            ${activo.codigo}
+          </p>
 
-            <p>
-              <strong>Ubicación:</strong>
-              ${existenciaSeleccionada.ubicacion}
-            </p>
+          <p>
+            <strong>Ubicación:</strong>
+            ${existenciaSeleccionada.ubicacion}
+          </p>
 
-            <p>
-              <strong>Cantidad:</strong>
-              ${cantidadNumero}
-            </p>
+          <p>
+            <strong>Cantidad:</strong>
+            ${cantidadNumero}
+          </p>
 
-            <p>
-              <strong>Cambio:</strong>
-              ${getEstadoLabel(existenciaSeleccionada.estado)}
-              →
-              ${getEstadoLabel(estadoDestino)}
-            </p>
+          <p>
+            <strong>Cambio:</strong>
+            ${getEstadoLabel(existenciaSeleccionada.estado)}
+            →
+            ${getEstadoLabel(estadoDestino)}
+          </p>
 
-          </div>
-        `,
+        </div>
+      `,
 
       showCancelButton: true,
 
@@ -435,15 +430,19 @@ function UpdateEstadoActivoModal({ open, onClose, activo, onUpdated }: Props) {
   ===================================================== */
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4">
+      {/* =================================================
+          MODAL
+      ================================================= */}
+
+      <div className="flex max-h-[95vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         {/* =================================================
-            HEADER
+            HEADER FIJO
         ================================================= */}
 
-        <div className="flex items-start justify-between border-b px-6 py-5">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
+        <div className="flex shrink-0 items-start justify-between border-b px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-w-0 pr-3">
+            <h2 className="text-xl font-bold text-gray-800 sm:text-2xl">
               Cambiar estado del activo
             </h2>
 
@@ -456,266 +455,290 @@ function UpdateEstadoActivoModal({ open, onClose, activo, onUpdated }: Props) {
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
+            className="shrink-0 rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
           >
             <X size={21} />
           </button>
         </div>
 
         {/* =================================================
-            INFORMACIÓN DEL ACTIVO
+            ÁREA CON SCROLL
+            - VERTICAL
+            - HORIZONTAL
         ================================================= */}
 
-        <div className="border-b bg-gray-50 px-6 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-lg font-semibold text-gray-800">
-                {activo.nombre}
-              </p>
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+          {/*
+            Este ancho mínimo provoca el scroll horizontal
+            únicamente cuando la pantalla es demasiado pequeña.
+          */}
 
-              <p className="text-sm text-gray-500">Código: {activo.codigo}</p>
-            </div>
+          <div className="min-w-[560px] sm:min-w-0">
+            {/* =================================================
+                INFORMACIÓN DEL ACTIVO
+            ================================================= */}
 
-            <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm shadow-sm">
-              <Boxes size={17} className="text-gray-500" />
-
-              <span className="text-gray-500">Control:</span>
-
-              <span className="font-semibold capitalize text-gray-800">
-                {activo.tipo_control === "unidad"
-                  ? "Individual"
-                  : "Por cantidad"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* =================================================
-            BODY
-        ================================================= */}
-
-        <form onSubmit={handleSubmit} className="space-y-6 p-6">
-          {/* =================================================
-              EXISTENCIA ORIGEN
-          ================================================= */}
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Existencia a modificar *
-            </label>
-
-            {existenciasDisponibles.length === 0 ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                No existen unidades disponibles para realizar un cambio manual
-                de estado. Las existencias alquiladas deben regresar mediante el
-                proceso de devolución.
-              </div>
-            ) : (
-              <select
-                value={existenciaId}
-                onChange={(e) => setExistenciaId(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)]"
-              >
-                {existenciasDisponibles.map((existencia) => (
-                  <option key={existencia.id} value={existencia.id}>
-                    {existencia.ubicacion} · {getEstadoLabel(existencia.estado)}{" "}
-                    · {existencia.cantidad} unidad(es)
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* =================================================
-              RESUMEN ORIGEN
-          ================================================= */}
-
-          {existenciaSeleccionada && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border bg-gray-50 p-4">
-                <div className="mb-2 flex items-center gap-2 text-gray-500">
-                  <MapPin size={17} />
-
-                  <span className="text-xs font-medium uppercase">
-                    Ubicación
-                  </span>
-                </div>
-
-                <p className="font-semibold text-gray-800">
-                  {existenciaSeleccionada.ubicacion}
-                </p>
-              </div>
-
-              <div className="rounded-xl border bg-gray-50 p-4">
-                <p className="mb-2 text-xs font-medium uppercase text-gray-500">
-                  Estado actual
-                </p>
-
-                <span
-                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getEstadoClass(
-                    existenciaSeleccionada.estado,
-                  )}`}
-                >
-                  {getEstadoIcon(existenciaSeleccionada.estado)}
-
-                  {getEstadoLabel(existenciaSeleccionada.estado)}
-                </span>
-              </div>
-
-              <div className="rounded-xl border bg-gray-50 p-4">
-                <p className="mb-2 text-xs font-medium uppercase text-gray-500">
-                  Cantidad actual
-                </p>
-
-                <p className="text-2xl font-bold text-gray-800">
-                  {existenciaSeleccionada.cantidad}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* =================================================
-              MOVIMIENTO
-          ================================================= */}
-
-          {existenciaSeleccionada && (
-            <>
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200" />
-
-                <ArrowRight size={20} className="text-gray-400" />
-
-                <div className="h-px flex-1 bg-gray-200" />
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {/* CANTIDAD */}
-
+            <div className="border-b bg-gray-50 px-4 py-4 sm:px-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Cantidad a mover *
-                  </label>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {activo.nombre}
+                  </p>
 
-                  <input
-                    type="number"
-                    min="1"
-                    max={existenciaSeleccionada.cantidad}
-                    step="1"
-                    value={cantidad}
-                    onChange={(e) => setCantidad(e.target.value)}
-                    disabled={activo.tipo_control === "unidad"}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)] disabled:bg-gray-100"
-                  />
-
-                  <p className="mt-1 text-xs text-gray-500">
-                    Máximo disponible: {existenciaSeleccionada.cantidad}
+                  <p className="text-sm text-gray-500">
+                    Código: {activo.codigo}
                   </p>
                 </div>
 
-                {/* DESTINO */}
+                <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm shadow-sm">
+                  <Boxes size={17} className="text-gray-500" />
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Nuevo estado *
-                  </label>
+                  <span className="text-gray-500">Control:</span>
 
+                  <span className="font-semibold capitalize text-gray-800">
+                    {activo.tipo_control === "unidad"
+                      ? "Individual"
+                      : "Por cantidad"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* =================================================
+                BODY
+            ================================================= */}
+
+            <form onSubmit={handleSubmit} className="space-y-6 p-4 sm:p-6">
+              {/* =================================================
+                  EXISTENCIA ORIGEN
+              ================================================= */}
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Existencia a modificar *
+                </label>
+
+                {existenciasDisponibles.length === 0 ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    No existen unidades disponibles para realizar un cambio
+                    manual de estado. Las existencias alquiladas deben regresar
+                    mediante el proceso de devolución.
+                  </div>
+                ) : (
                   <select
-                    value={estadoDestino}
-                    onChange={(e) =>
-                      setEstadoDestino(e.target.value as EstadoManual)
-                    }
+                    value={existenciaId}
+                    onChange={(e) => setExistenciaId(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)]"
                   >
-                    {estadosDestino
-                      .filter(
-                        (estado) =>
-                          estado.value !== existenciaSeleccionada.estado,
-                      )
-                      .map((estado) => (
-                        <option key={estado.value} value={estado.value}>
-                          {estado.label}
-                        </option>
-                      ))}
+                    {existenciasDisponibles.map((existencia) => (
+                      <option key={existencia.id} value={existencia.id}>
+                        {existencia.ubicacion} ·{" "}
+                        {getEstadoLabel(existencia.estado)} ·{" "}
+                        {existencia.cantidad} unidad(es)
+                      </option>
+                    ))}
                   </select>
-                </div>
-
-                {/* MOTIVO */}
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Motivo
-                  </label>
-
-                  <textarea
-                    rows={3}
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Ejemplo: mantenimiento preventivo, equipo dañado, pérdida reportada..."
-                    className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)]"
-                  />
-                </div>
+                )}
               </div>
 
-              {/* PREVISUALIZACIÓN */}
+              {/* =================================================
+                  RESUMEN ORIGEN
+              ================================================= */}
 
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <div className="flex gap-3">
-                  <Info size={20} className="mt-0.5 shrink-0 text-blue-600" />
+              {existenciaSeleccionada && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border bg-gray-50 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-gray-500">
+                      <MapPin size={17} />
 
-                  <div className="text-sm leading-6 text-blue-800">
-                    Se moverán{" "}
-                    <strong>{Number(cantidad) || 0} unidad(es)</strong> desde{" "}
-                    <strong>
+                      <span className="text-xs font-medium uppercase">
+                        Ubicación
+                      </span>
+                    </div>
+
+                    <p className="font-semibold text-gray-800">
+                      {existenciaSeleccionada.ubicacion}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border bg-gray-50 p-4">
+                    <p className="mb-2 text-xs font-medium uppercase text-gray-500">
+                      Estado actual
+                    </p>
+
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getEstadoClass(
+                        existenciaSeleccionada.estado,
+                      )}`}
+                    >
+                      {getEstadoIcon(existenciaSeleccionada.estado)}
+
                       {getEstadoLabel(existenciaSeleccionada.estado)}
-                    </strong>{" "}
-                    hacia <strong>{getEstadoLabel(estadoDestino)}</strong> en la
-                    ubicación{" "}
-                    <strong>{existenciaSeleccionada.ubicacion}</strong>.
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border bg-gray-50 p-4">
+                    <p className="mb-2 text-xs font-medium uppercase text-gray-500">
+                      Cantidad actual
+                    </p>
+
+                    <p className="text-2xl font-bold text-gray-800">
+                      {existenciaSeleccionada.cantidad}
+                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
-                El estado <strong>Alquilado</strong> no puede asignarse
-                manualmente. Se genera automáticamente al registrar activos en
-                un contrato y se revierte mediante una devolución.
-              </div>
-            </>
-          )}
+              {/* =================================================
+                  MOVIMIENTO
+              ================================================= */}
 
-          {/* =================================================
-              BOTONES
-          ================================================= */}
-
-          <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-lg border bg-white px-5 py-2.5 font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-40"
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              disabled={saving || !existenciaSeleccionada}
-              className="flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving ? (
+              {existenciaSeleccionada && (
                 <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Actualizando...
-                </>
-              ) : (
-                <>
-                  <ArrowRight size={18} />
-                  Cambiar estado
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-gray-200" />
+
+                    <ArrowRight size={20} className="text-gray-400" />
+
+                    <div className="h-px flex-1 bg-gray-200" />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    {/* CANTIDAD */}
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Cantidad a mover *
+                      </label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        max={existenciaSeleccionada.cantidad}
+                        step="1"
+                        value={cantidad}
+                        onChange={(e) => setCantidad(e.target.value)}
+                        disabled={activo.tipo_control === "unidad"}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)] disabled:bg-gray-100"
+                      />
+
+                      <p className="mt-1 text-xs text-gray-500">
+                        Máximo disponible: {existenciaSeleccionada.cantidad}
+                      </p>
+                    </div>
+
+                    {/* DESTINO */}
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Nuevo estado *
+                      </label>
+
+                      <select
+                        value={estadoDestino}
+                        onChange={(e) =>
+                          setEstadoDestino(e.target.value as EstadoManual)
+                        }
+                        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)]"
+                      >
+                        {estadosDestino
+                          .filter(
+                            (estado) =>
+                              estado.value !== existenciaSeleccionada.estado,
+                          )
+                          .map((estado) => (
+                            <option key={estado.value} value={estado.value}>
+                              {estado.label}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* MOTIVO */}
+
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Motivo
+                      </label>
+
+                      <textarea
+                        rows={3}
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        placeholder="Ejemplo: mantenimiento preventivo, equipo dañado, pérdida reportada..."
+                        className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 outline-none transition focus:border-[var(--color-primary)]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* =================================================
+                      PREVISUALIZACIÓN
+                  ================================================= */}
+
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <div className="flex gap-3">
+                      <Info
+                        size={20}
+                        className="mt-0.5 shrink-0 text-blue-600"
+                      />
+
+                      <div className="text-sm leading-6 text-blue-800">
+                        Se moverán{" "}
+                        <strong>{Number(cantidad) || 0} unidad(es)</strong>{" "}
+                        desde{" "}
+                        <strong>
+                          {getEstadoLabel(existenciaSeleccionada.estado)}
+                        </strong>{" "}
+                        hacia <strong>{getEstadoLabel(estadoDestino)}</strong>{" "}
+                        en la ubicación{" "}
+                        <strong>{existenciaSeleccionada.ubicacion}</strong>.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+                    El estado <strong>Alquilado</strong> no puede asignarse
+                    manualmente. Se genera automáticamente al registrar activos
+                    en un contrato y se revierte mediante una devolución.
+                  </div>
                 </>
               )}
-            </button>
+
+              {/* =================================================
+                  BOTONES
+              ================================================= */}
+
+              <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={saving}
+                  className="rounded-lg border bg-white px-5 py-2.5 font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving || !existenciaSeleccionada}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight size={18} />
+                      Cambiar estado
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

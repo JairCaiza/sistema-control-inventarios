@@ -547,7 +547,7 @@ const RegistrarEntradaModal = ({
 
         <div
           className="
-            flex items-start justify-between
+            flex shrink-0 items-start justify-between
             border-b border-slate-200
             bg-white
             px-6 py-5
@@ -597,10 +597,10 @@ const RegistrarEntradaModal = ({
         </div>
 
         {/* =================================================
-            CONTENIDO
+            CONTENIDO CON SCROLL VERTICAL DERECHO
         ================================================= */}
 
-        <div className="overflow-y-auto bg-white px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white px-6 py-5">
           {/* ERROR */}
 
           {errorCatalogos && (
@@ -724,7 +724,9 @@ const RegistrarEntradaModal = ({
 
                     {empleados.map((empleado) => (
                       <option key={empleado.id} value={empleado.id}>
-                        {`${empleado.apellidos || ""} ${empleado.nombres || ""}`.trim()}
+                        {`${empleado.apellidos || ""} ${
+                          empleado.nombres || ""
+                        }`.trim()}
                         {empleado.cedula ? ` - ${empleado.cedula}` : ""}
                       </option>
                     ))}
@@ -1017,11 +1019,11 @@ const RegistrarEntradaModal = ({
               {form.empleado_id && form.obra_id && form.fecha_hora && (
                 <div
                   className="
-                    rounded-xl
-                    border border-emerald-200
-                    bg-emerald-50
-                    p-4
-                  "
+                      rounded-xl
+                      border border-emerald-200
+                      bg-emerald-50
+                      p-4
+                    "
                 >
                   <div className="flex items-start gap-3">
                     <CheckCircle2
@@ -1037,7 +1039,9 @@ const RegistrarEntradaModal = ({
                       <p className="mt-1 text-xs leading-5 text-slate-600">
                         Se registrará la entrada de{" "}
                         <strong className="font-semibold text-slate-800">
-                          {`${empleadoSeleccionado?.nombres || ""} ${empleadoSeleccionado?.apellidos || ""}`.trim()}
+                          {`${empleadoSeleccionado?.nombres || ""} ${
+                            empleadoSeleccionado?.apellidos || ""
+                          }`.trim()}
                         </strong>{" "}
                         en{" "}
                         <strong className="font-semibold text-slate-800">
@@ -1063,7 +1067,7 @@ const RegistrarEntradaModal = ({
 
         <div
           className="
-            flex flex-col-reverse
+            flex shrink-0 flex-col-reverse
             gap-3
             border-t border-slate-200
             bg-slate-50

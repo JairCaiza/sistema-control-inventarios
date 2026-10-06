@@ -22,8 +22,6 @@ import {
   TrendingUp,
   ArrowLeftRight,
   DollarSign,
-  CalendarDays,
-  Lock,
   UserCircle,
   PiggyBank,
 } from "lucide-react";
@@ -328,9 +326,7 @@ function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     isSectionActive("/dashboard/egresos") ||
     isSectionActive("/dashboard/transferencias") ||
     isSectionActive("/dashboard/flujo-de-caja") ||
-    isSectionActive("/dashboard/utilidadmensual") ||
-    isSectionActive("/dashboard/cierres") ||
-    isSectionActive("/dashboard/periodos");
+    isSectionActive("/dashboard/utilidadmensual");
 
   const personalAbierto =
     openPersonal ||
@@ -905,22 +901,6 @@ function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               >
                 <BarChart3 size={16} />
                 Utilidad Mensual
-              </Link>
-
-              <Link
-                to="/dashboard/cierres"
-                className={claseSubItem(isActive("/dashboard/cierres"))}
-              >
-                <CalendarDays size={16} />
-                Cierres
-              </Link>
-
-              <Link
-                to="/dashboard/periodos"
-                className={claseSubItem(isActive("/dashboard/periodos"))}
-              >
-                <Lock size={16} />
-                Periodos
               </Link>
             </div>
           )}

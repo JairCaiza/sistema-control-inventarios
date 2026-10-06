@@ -49,13 +49,9 @@ interface Obra {
 
 interface RegistrarSalidaModalProps {
   isOpen: boolean;
-
   onClose: () => void;
-
   onSuccess?: () => void | Promise<void>;
-
   empleadoInicialId?: string;
-
   obraInicialId?: string;
 }
 
@@ -65,21 +61,15 @@ interface RegistrarSalidaModalProps {
 
 interface FormState {
   empleado_id: string;
-
   obra_id: string;
-
   fecha_hora: string;
-
   observaciones: string;
 }
 
 interface FormErrors {
   empleado_id?: string;
-
   obra_id?: string;
-
   fecha_hora?: string;
-
   observaciones?: string;
 }
 
@@ -91,13 +81,9 @@ const obtenerFechaHoraLocal = (): string => {
   const ahora = new Date();
 
   const year = ahora.getFullYear();
-
   const month = String(ahora.getMonth() + 1).padStart(2, "0");
-
   const day = String(ahora.getDate()).padStart(2, "0");
-
   const hours = String(ahora.getHours()).padStart(2, "0");
-
   const minutes = String(ahora.getMinutes()).padStart(2, "0");
 
   return `${year}-${month}-${day}T${hours}:${minutes}`;
@@ -133,7 +119,6 @@ const obtenerMensajeError = (error: unknown): string => {
     const data = error.response?.data as
       | {
           message?: string;
-
           errores?: Array<{
             mensaje?: string;
           }>;
@@ -251,11 +236,9 @@ const RegistrarSalidaModal = ({
   ================================================= */
 
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-
   const [obras, setObras] = useState<Obra[]>([]);
 
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
-
   const [loadingSubmit, setLoadingSubmit] = useState(false);
 
   const [errorCatalogos, setErrorCatalogos] = useState<string | null>(null);
@@ -264,11 +247,8 @@ const RegistrarSalidaModal = ({
 
   const [form, setForm] = useState<FormState>({
     empleado_id: empleadoInicialId,
-
     obra_id: obraInicialId,
-
     fecha_hora: obtenerFechaHoraLocal(),
-
     observaciones: "",
   });
 
@@ -279,11 +259,8 @@ const RegistrarSalidaModal = ({
   const resetFormulario = () => {
     setForm({
       empleado_id: empleadoInicialId,
-
       obra_id: obraInicialId,
-
       fecha_hora: obtenerFechaHoraLocal(),
-
       observaciones: "",
     });
 
@@ -297,24 +274,20 @@ const RegistrarSalidaModal = ({
   const cargarCatalogos = async () => {
     try {
       setLoadingCatalogos(true);
-
       setErrorCatalogos(null);
 
       const [empleadosResponse, obrasResponse] = await Promise.all([
         api.get("/empleados"),
-
         api.get("/obras"),
       ]);
 
       const empleadosData = extraerEmpleados(empleadosResponse.data);
-
       const obrasData = extraerObras(obrasResponse.data);
 
       const empleadosActivos = empleadosData
         .filter((empleado) => empleado.activo !== false)
         .sort((a, b) => {
           const nombreA = `${a.apellidos || ""} ${a.nombres || ""}`;
-
           const nombreB = `${b.apellidos || ""} ${b.nombres || ""}`;
 
           return nombreA.localeCompare(nombreB, "es");
@@ -325,13 +298,11 @@ const RegistrarSalidaModal = ({
         .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
       setEmpleados(empleadosActivos);
-
       setObras(obrasDisponibles);
     } catch (error) {
       console.error("Error cargando catálogos para salida:", error);
 
       setEmpleados([]);
-
       setObras([]);
 
       setErrorCatalogos(obtenerMensajeError(error));
@@ -424,13 +395,11 @@ const RegistrarSalidaModal = ({
   ) => {
     setForm((prev) => ({
       ...prev,
-
       [campo]: valor,
     }));
 
     setErrors((prev) => ({
       ...prev,
-
       [campo]: undefined,
     }));
   };
@@ -499,9 +468,7 @@ const RegistrarSalidaModal = ({
 
       const payload: RegistrarSalidaPayload = {
         empleado_id: form.empleado_id,
-
         obra_id: form.obra_id,
-
         fecha_hora: form.fecha_hora,
 
         observaciones: form.observaciones.trim()
@@ -520,23 +487,20 @@ const RegistrarSalidaModal = ({
 
         html: tiempo
           ? `
-                <div style="text-align:center">
-                  <p>
-                    ${
-                      respuesta.message ||
-                      "La salida se registró correctamente."
-                    }
-                  </p>
+              <div style="text-align:center">
+                <p>
+                  ${respuesta.message || "La salida se registró correctamente."}
+                </p>
 
-                  <p style="
-                    margin-top:12px;
-                    font-weight:600;
-                  ">
-                    Tiempo trabajado:
-                    ${tiempo}
-                  </p>
-                </div>
-              `
+                <p style="
+                  margin-top:12px;
+                  font-weight:600;
+                ">
+                  Tiempo trabajado:
+                  ${tiempo}
+                </p>
+              </div>
+            `
           : respuesta.message || "La salida se registró correctamente.",
 
         confirmButtonText: "Aceptar",
@@ -638,6 +602,7 @@ const RegistrarSalidaModal = ({
         <div
           className="
             flex
+            shrink-0
             items-start
             justify-between
             border-b
@@ -715,10 +680,13 @@ const RegistrarSalidaModal = ({
 
         {/* =====================================
             CONTENIDO
+            SCROLL VERTICAL DERECHO
         ====================================== */}
 
         <div
           className="
+            min-h-0
+            flex-1
             overflow-y-auto
             bg-white
             px-6
@@ -923,7 +891,9 @@ const RegistrarSalidaModal = ({
 
                     {empleados.map((empleado) => (
                       <option key={empleado.id} value={empleado.id}>
-                        {`${empleado.apellidos || ""} ${empleado.nombres || ""}`.trim()}
+                        {`${empleado.apellidos || ""} ${
+                          empleado.nombres || ""
+                        }`.trim()}
 
                         {empleado.cedula ? ` - ${empleado.cedula}` : ""}
                       </option>
@@ -1266,8 +1236,7 @@ const RegistrarSalidaModal = ({
                       }
                     `}
                   >
-                    {form.observaciones.length}
-                    /500
+                    {form.observaciones.length}/500
                   </span>
                 </div>
 
@@ -1392,7 +1361,9 @@ const RegistrarSalidaModal = ({
                               text-slate-800
                             "
                         >
-                          {`${empleadoSeleccionado?.nombres || ""} ${empleadoSeleccionado?.apellidos || ""}`.trim()}
+                          {`${empleadoSeleccionado?.nombres || ""} ${
+                            empleadoSeleccionado?.apellidos || ""
+                          }`.trim()}
                         </strong>{" "}
                         de{" "}
                         <strong
@@ -1429,6 +1400,7 @@ const RegistrarSalidaModal = ({
         <div
           className="
             flex
+            shrink-0
             flex-col-reverse
             gap-3
             border-t
