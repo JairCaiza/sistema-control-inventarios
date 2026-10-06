@@ -123,16 +123,38 @@ const formatearHora = (fecha?: string | null): string => {
     return "—";
   }
 
-  const valor = new Date(fecha);
+  /*
+   * Los campos primera_entrada y ultima_salida provienen de
+   * TIMESTAMP WITHOUT TIME ZONE.
+   *
+   * Representan hora local de la jornada y no deben convertirse
+   * nuevamente mediante new Date(), porque el navegador aplicaría
+   * la zona horaria y desplazaría la hora.
+   *
+   * Ejemplo:
+   * 2026-10-06 07:00:00 -> 07:00 a. m.
+   */
 
-  if (Number.isNaN(valor.getTime())) {
+  const coincidencia = String(fecha).match(
+    /(?:T|\s)(\d{2}):(\d{2})(?::\d{2})?/,
+  );
+
+  if (!coincidencia) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("es-EC", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(valor);
+  const horas = Number(coincidencia[1]);
+  const minutos = coincidencia[2];
+
+  if (Number.isNaN(horas) || horas < 0 || horas > 23) {
+    return "—";
+  }
+
+  const periodo = horas >= 12 ? "p. m." : "a. m.";
+
+  const hora12 = horas % 12 || 12;
+
+  return `${String(hora12).padStart(2, "0")}:${minutos} ${periodo}`;
 };
 
 /* =====================================================
