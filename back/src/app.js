@@ -46,6 +46,9 @@ const gastoObraRoutes =
 const reporteObraRoutes =
    require("./modules/gestion_obras/reportesObra/reporteObra.routes");
 const asistenciaRoutes = require("./modules/gestion_obras/asistencia/asistencia.routes");
+const jornadasAlquilerRoutes = require(
+   "./modules/jornadas_alquiler/jornadasAlquiler.routes"
+);
 const app = express();
 
 /* =========================
@@ -187,6 +190,10 @@ app.use(
    reporteObraRoutes
 );
 app.use("/api/asistencias", asistenciaRoutes);
+app.use(
+   "/api/jornadas-alquiler",
+   jornadasAlquilerRoutes
+);
 /* =========================
    ERROR HANDLER
 ========================= */

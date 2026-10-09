@@ -2,21 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 
-import {
-  FaEye,
-  FaEdit,
-  FaTrash,
-  FaExchangeAlt,
-  FaMoneyBillWave,
-  FaFileInvoiceDollar,
-  FaToggleOn,
-  FaToggleOff,
-} from "react-icons/fa";
+import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
 
 import CreateCuentaModal from "../components/CreateCuentaModal";
 
 import {
-  changeCuentaStatus,
   deleteCuenta,
   getCuentas,
   getResumenCuentas,
@@ -24,8 +14,17 @@ import {
   type ResumenCuentas,
 } from "../service/cuentaService";
 
+// =====================================================
+// PÁGINA DE CUENTAS FINANCIERAS
+// =====================================================
+
 function CuentaPage() {
+  // ===================================================
+  // ESTADOS
+  // ===================================================
+
   const [cuentas, setCuentas] = useState<CuentaFinanciera[]>([]);
+
   const [resumen, setResumen] = useState<ResumenCuentas>({
     total_cuentas: 0,
     saldo_cajas: 0,
@@ -33,10 +32,39 @@ function CuentaPage() {
   });
 
   const [loading, setLoading] = useState(true);
+
   const [modalOpen, setModalOpen] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
+
   const [tipoFiltro, setTipoFiltro] = useState("todas");
+
+  // ===================================================
+  // OBTENER MENSAJE DE ERROR
+  // ===================================================
+
+  const obtenerMensajeError = (
+    error: unknown,
+    mensajePredeterminado: string,
+  ): string => {
+    if (axios.isAxiosError(error)) {
+      return (
+        error.response?.data?.message ??
+        error.response?.data?.error ??
+        mensajePredeterminado
+      );
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return mensajePredeterminado;
+  };
+
+  // ===================================================
+  // CARGAR CUENTAS Y RESUMEN
+  // ===================================================
 
   const cargarDatos = async () => {
     try {
@@ -48,44 +76,51 @@ function CuentaPage() {
       ]);
 
       setCuentas(cuentasData);
+
       setResumen(resumenData);
     } catch (error: unknown) {
-      let mensaje = "No se pudieron cargar las cuentas financieras.";
-
-      if (axios.isAxiosError(error)) {
-        mensaje =
-          error.response?.data?.message ??
-          error.response?.data?.error ??
-          mensaje;
-      }
-
       await Swal.fire({
         icon: "error",
         title: "Error",
-        text: mensaje,
+        text: obtenerMensajeError(
+          error,
+          "No se pudieron cargar las cuentas financieras.",
+        ),
       });
     } finally {
       setLoading(false);
     }
   };
 
+  // ===================================================
+  // CARGA INICIAL
+  // ===================================================
+
   useEffect(() => {
-    cargarDatos();
+    void cargarDatos();
   }, []);
+
+  // ===================================================
+  // FILTRAR CUENTAS
+  // ===================================================
 
   const cuentasFiltradas = useMemo(() => {
     return cuentas.filter((cuenta) => {
+      const textoBusqueda = busqueda.toLowerCase().trim();
+
       const coincideBusqueda =
-        cuenta.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        (cuenta.observaciones ?? "")
-          .toLowerCase()
-          .includes(busqueda.toLowerCase());
+        cuenta.nombre.toLowerCase().includes(textoBusqueda) ||
+        (cuenta.observaciones ?? "").toLowerCase().includes(textoBusqueda);
 
       const coincideTipo = tipoFiltro === "todas" || cuenta.tipo === tipoFiltro;
 
       return coincideBusqueda && coincideTipo;
     });
   }, [cuentas, busqueda, tipoFiltro]);
+
+  // ===================================================
+  // FORMATEAR MONEDA
+  // ===================================================
 
   const formatMoney = (value: number | string): string => {
     return Number(value || 0).toLocaleString("es-EC", {
@@ -95,11 +130,102 @@ function CuentaPage() {
     });
   };
 
+  // ===================================================
+  // ESCAPAR HTML
+  // ===================================================
+
+  const escaparHtml = (valor: unknown): string => {
+    return String(valor ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
+  // ===================================================
+  // VER DETALLE DE CUENTA
+  // ===================================================
+
+  const handleVer = async (cuenta: CuentaFinanciera) => {
+    await Swal.fire({
+      title: "Detalle de cuenta financiera",
+      width: 550,
+      confirmButtonText: "Cerrar",
+      html: `
+        <div style="text-align:left;line-height:2">
+          <p>
+            <strong>Nombre:</strong>
+            ${escaparHtml(cuenta.nombre)}
+          </p>
+
+          <p>
+            <strong>Tipo:</strong>
+            ${escaparHtml(cuenta.tipo)}
+          </p>
+
+          <p>
+            <strong>Saldo actual:</strong>
+            ${escaparHtml(formatMoney(cuenta.saldo_actual))}
+          </p>
+
+          <p>
+            <strong>Movimientos:</strong>
+            ${Number(cuenta.movimientos || 0)}
+          </p>
+
+          <p>
+            <strong>Estado:</strong>
+            ${cuenta.activo ? "Activa" : "Inactiva"}
+          </p>
+
+          <p>
+            <strong>Observaciones:</strong>
+            ${escaparHtml(cuenta.observaciones || "Sin observaciones")}
+          </p>
+        </div>
+      `,
+    });
+  };
+
+  // ===================================================
+  // EDITAR CUENTA
+  // ===================================================
+
+  const handleEditar = async (cuenta: CuentaFinanciera) => {
+    await Swal.fire({
+      icon: "info",
+      title: "Editar cuenta financiera",
+      html: `
+        <p>
+          Cuenta seleccionada:
+          <strong>${escaparHtml(cuenta.nombre)}</strong>
+        </p>
+        <p style="margin-top:12px">
+          El formulario de edición todavía no está
+          conectado con el servicio de actualización.
+        </p>
+      `,
+      confirmButtonText: "Entendido",
+    });
+  };
+
+  // ===================================================
+  // ELIMINAR CUENTA
+  // ===================================================
+
   const handleDelete = async (cuenta: CuentaFinanciera) => {
     const confirmacion = await Swal.fire({
       icon: "warning",
       title: "¿Eliminar cuenta?",
-      html: `Se eliminará la cuenta <strong>${cuenta.nombre}</strong>.`,
+      html: `
+        Se eliminará la cuenta
+        <strong>${escaparHtml(cuenta.nombre)}</strong>.
+        <p style="margin-top:12px">
+          Esta operación puede afectar registros
+          financieros relacionados.
+        </p>
+      `,
       showCancelButton: true,
       confirmButtonText: "Sí, eliminar",
       cancelButtonText: "Cancelar",
@@ -121,72 +247,27 @@ function CuentaPage() {
 
       await cargarDatos();
     } catch (error: unknown) {
-      let mensaje = "No se pudo eliminar la cuenta financiera.";
-
-      if (axios.isAxiosError(error)) {
-        mensaje =
-          error.response?.data?.message ??
-          error.response?.data?.error ??
-          mensaje;
-      }
-
       await Swal.fire({
         icon: "error",
         title: "No se pudo eliminar",
-        text: mensaje,
+        text: obtenerMensajeError(
+          error,
+          "No se pudo eliminar la cuenta financiera.",
+        ),
       });
     }
   };
 
-  const handleChangeStatus = async (cuenta: CuentaFinanciera) => {
-    const nuevoEstado = !cuenta.activo;
-
-    const confirmacion = await Swal.fire({
-      icon: "question",
-      title: nuevoEstado ? "¿Activar cuenta?" : "¿Inactivar cuenta?",
-      text: nuevoEstado
-        ? `Se activará la cuenta ${cuenta.nombre}.`
-        : `La cuenta ${cuenta.nombre} dejará de estar disponible para nuevas operaciones.`,
-      showCancelButton: true,
-      confirmButtonText: nuevoEstado ? "Sí, activar" : "Sí, inactivar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (!confirmacion.isConfirmed) return;
-
-    try {
-      await changeCuentaStatus(cuenta.id, nuevoEstado);
-
-      await cargarDatos();
-    } catch (error: unknown) {
-      let mensaje = "No se pudo cambiar el estado de la cuenta.";
-
-      if (axios.isAxiosError(error)) {
-        mensaje =
-          error.response?.data?.message ??
-          error.response?.data?.error ??
-          mensaje;
-      }
-
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: mensaje,
-      });
-    }
-  };
-
-  const funcionPendiente = async (nombre: string) => {
-    await Swal.fire({
-      icon: "info",
-      title: nombre,
-      text: "Esta funcionalidad se implementará en la siguiente historia de usuario.",
-    });
-  };
+  // ===================================================
+  // RENDER
+  // ===================================================
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
+      {/* ===============================================
+          ENCABEZADO
+      =============================================== */}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Cuentas financieras</h1>
@@ -197,6 +278,7 @@ function CuentaPage() {
         </div>
 
         <button
+          type="button"
           onClick={() => setModalOpen(true)}
           className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-white hover:opacity-90"
         >
@@ -204,7 +286,10 @@ function CuentaPage() {
         </button>
       </div>
 
-      {/* RESUMEN */}
+      {/* ===============================================
+          RESUMEN FINANCIERO
+      =============================================== */}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-white p-4 shadow">
           <p className="text-sm text-gray-500">Total cuentas activas</p>
@@ -231,7 +316,10 @@ function CuentaPage() {
         </div>
       </div>
 
-      {/* FILTROS */}
+      {/* ===============================================
+          FILTROS
+      =============================================== */}
+
       <div className="rounded-lg border bg-white p-4 shadow">
         <div className="flex flex-col gap-4 md:flex-row">
           <input
@@ -248,28 +336,31 @@ function CuentaPage() {
             className="rounded border px-3 py-2"
           >
             <option value="todas">Todas</option>
-
             <option value="caja">Caja</option>
-
             <option value="banco">Banco</option>
-
             <option value="efectivo">Efectivo</option>
           </select>
         </div>
       </div>
 
-      {/* LOADING */}
+      {/* ===============================================
+          CARGANDO
+      =============================================== */}
+
       {loading && (
         <div className="py-10 text-center text-gray-500">
           Cargando cuentas...
         </div>
       )}
 
-      {/* TABLA */}
+      {/* ===============================================
+          TABLA DE CUENTAS
+      =============================================== */}
+
       {!loading && (
         <div className="overflow-hidden rounded-lg border bg-white shadow">
           <div className="overflow-x-auto">
-            <table className="min-w-[950px] w-full">
+            <table className="w-full min-w-[850px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-semibold">
@@ -292,7 +383,7 @@ function CuentaPage() {
                     Estado
                   </th>
 
-                  <th className="px-4 py-3 text-left text-sm font-semibold">
+                  <th className="px-4 py-3 text-center text-sm font-semibold">
                     Acciones
                   </th>
                 </tr>
@@ -312,6 +403,8 @@ function CuentaPage() {
                     key={cuenta.id}
                     className="border-t transition hover:bg-gray-50"
                   >
+                    {/* CUENTA */}
+
                     <td className="px-4 py-3">
                       <p className="font-medium">{cuenta.nombre}</p>
 
@@ -322,15 +415,23 @@ function CuentaPage() {
                       )}
                     </td>
 
+                    {/* TIPO */}
+
                     <td className="px-4 py-3 capitalize">{cuenta.tipo}</td>
+
+                    {/* SALDO */}
 
                     <td className="px-4 py-3 font-medium">
                       {formatMoney(cuenta.saldo_actual)}
                     </td>
 
+                    {/* MOVIMIENTOS */}
+
                     <td className="px-4 py-3">
                       {Number(cuenta.movimientos || 0)}
                     </td>
+
+                    {/* ESTADO */}
 
                     <td className="px-4 py-3">
                       <span
@@ -344,70 +445,47 @@ function CuentaPage() {
                       </span>
                     </td>
 
+                    {/* ACCIONES */}
+
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-center gap-3">
+                        {/* VER */}
+
                         <button
+                          type="button"
                           title="Ver detalle"
-                          onClick={() => funcionPendiente("Detalle de cuenta")}
-                          className="text-cyan-600 transition hover:scale-110"
+                          aria-label={`Ver ${cuenta.nombre}`}
+                          onClick={() => void handleVer(cuenta)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-100"
                         >
                           <FaEye />
+                          Ver
                         </button>
 
+                        {/* EDITAR */}
+
                         <button
-                          title="Editar"
-                          onClick={() => funcionPendiente("Editar cuenta")}
-                          className="text-blue-600 transition hover:scale-110"
+                          type="button"
+                          title="Editar cuenta"
+                          aria-label={`Editar ${cuenta.nombre}`}
+                          onClick={() => void handleEditar(cuenta)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
                         >
                           <FaEdit />
+                          Editar
                         </button>
 
-                        <button
-                          title="Ver movimientos"
-                          onClick={() =>
-                            funcionPendiente("Movimientos de cuenta")
-                          }
-                          className="text-purple-600 transition hover:scale-110"
-                        >
-                          <FaFileInvoiceDollar />
-                        </button>
+                        {/* ELIMINAR */}
 
                         <button
-                          title="Registrar ingreso"
-                          disabled={!cuenta.activo}
-                          onClick={() => funcionPendiente("Registrar ingreso")}
-                          className="text-green-600 transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <FaMoneyBillWave />
-                        </button>
-
-                        <button
-                          title="Transferir"
-                          disabled={!cuenta.activo}
-                          onClick={() => funcionPendiente("Transferencia")}
-                          className="text-orange-600 transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <FaExchangeAlt />
-                        </button>
-
-                        <button
-                          title={cuenta.activo ? "Inactivar" : "Activar"}
-                          onClick={() => handleChangeStatus(cuenta)}
-                          className={
-                            cuenta.activo
-                              ? "text-amber-600 transition hover:scale-110"
-                              : "text-green-600 transition hover:scale-110"
-                          }
-                        >
-                          {cuenta.activo ? <FaToggleOn /> : <FaToggleOff />}
-                        </button>
-
-                        <button
-                          title="Eliminar"
-                          onClick={() => handleDelete(cuenta)}
-                          className="text-red-600 transition hover:scale-110"
+                          type="button"
+                          title="Eliminar cuenta"
+                          aria-label={`Eliminar ${cuenta.nombre}`}
+                          onClick={() => void handleDelete(cuenta)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
                         >
                           <FaTrash />
+                          Eliminar
                         </button>
                       </div>
                     </td>
@@ -418,6 +496,10 @@ function CuentaPage() {
           </div>
         </div>
       )}
+
+      {/* ===============================================
+          MODAL CREAR CUENTA
+      =============================================== */}
 
       <CreateCuentaModal
         open={modalOpen}
